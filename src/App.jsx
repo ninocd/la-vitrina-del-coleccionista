@@ -475,7 +475,7 @@ export default function App() {
   }
 
   // MANEJADOR DE ESCÁNER VÍA VERCEL SERVERLESS API
-  const handleScanImage = async (e) => {
+ const handleScanImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -484,27 +484,37 @@ export default function App() {
     setDebugError(null);
 
     try {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = async () => {
-        const fullBase64 = reader.result;
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      
+      img.onload = async () => {
+        // Redimensionar imagen a máx 800px para acelerar el procesamiento de la IA
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const scale = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scale;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const fullBase64 = canvas.toDataURL('image/jpeg', 0.8);
         setScannedImageBase64(fullBase64);
         const base64Data = fullBase64.split(',')[1];
 
-        // Llamada a nuestro servidor interno en Vercel (/api/scan)
         const response = await fetch('/api/scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             imageBase64: base64Data,
-            mimeType: file.type || 'image/jpeg'
+            mimeType: 'image/jpeg'
           })
         });
 
         const data = await response.json();
 
         if (!response.ok || data.error) {
-          setDebugError(`Error en el servidor: ${data.error}`);
+          setDebugError(`Error en servidor: ${data.error}`);
           setScanning(false);
           return;
         }
@@ -517,7 +527,7 @@ export default function App() {
             const parsedResult = JSON.parse(cleanedJson);
             setScanResult(parsedResult);
           } catch (jsonErr) {
-            setDebugError(`Error al interpretar JSON: ${rawText}`);
+            setDebugError(`Error al interpretar respuesta: ${rawText}`);
           }
         } else {
           setDebugError("La IA no devolvió un resultado utilizable.");
