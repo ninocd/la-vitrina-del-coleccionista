@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  --color-barbie-bg: #FDFBF7;
+  --color-barbie-pink: #E91E63;
+  --color-barbie-lightPink: #FCE4EC;
+  --color-barbie-gold: #D4AF37;
+  --color-barbie-cream: #F8F4E9;
+  --color-barbie-darkText: #2C2C2C;
+}
