@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+// Configuración de Supabase
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-// Evita que la app colapse si la URL de Supabase aún no está cargada
+// Instancia segura de Supabase
 export const supabase = (supabaseUrl && supabaseAnonKey) 
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
@@ -27,10 +28,9 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('catalog');
 
-  // Datos
+  // Datos principales
   const [masterCatalog, setMasterCatalog] = useState([]);
   const [myCollection, setMyCollection] = useState([]);
-  const [wishlist, setWishlist] = useState([]);
 
   // Filtros del Catálogo
   const [catalogSearchTerm, setCatalogSearchTerm] = useState('');
@@ -54,14 +54,14 @@ export default function App() {
   const [scannedImageBase64, setScannedImageBase64] = useState(null);
   const [debugError, setDebugError] = useState(null);
 
-  // Moneda
+  // Configuración de Moneda
   const [currency, setCurrency] = useState('EUR');
   const exchangeRateUSD = 1.08;
 
   useEffect(() => {
     if (!supabase) {
-      console.warn("Supabase no está configurado. Verifica las variables VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.");
-      setLoading(false);
+      console.warn("Supabase no está configurado. Verifica las variables VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en Vercel.");
+      fetchMasterCatalog();
       return;
     }
 
@@ -76,21 +76,32 @@ export default function App() {
     });
 
     fetchMasterCatalog();
+
     return () => subscription.unsubscribe();
   }, []);
 
-  // 1. Cargar catálogo maestro desde Supabase (lore prioritario)
+  // 1. CARGAR CATÁLOGO MAESTRO (PRIORIDAD AL LORE DE SUPABASE CON RESPALDO)
   async function fetchMasterCatalog() {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('barbies_master')
-        .select('*')
-        .order('release_year', { ascending: true });
+      let data = null;
+      
+      if (supabase) {
+        const res = await supabase
+          .from('barbies_master')
+          .select('*')
+          .order('release_year', { ascending: true });
+        data = res.data;
+      }
 
-      if (error) throw error;
+      // Si la base de datos está vacía o no responde, mostramos el catálogo base de ejemplo
+      const sourceData = (data && data.length > 0) ? data : [
+        { id: 1, name: "Barbie Extra Millennial Pink", collection_line: "Barbie Extra", release_year: 2020, estimated_min_price: 45, lore: "Edición moderna con abrigo rosa de pelo sintético y mascota." },
+        { id: 2, name: "Barbie Totally Hair", collection_line: "Totally Hair", release_year: 1992, estimated_min_price: 120, lore: "La Barbie más vendida de la historia de Mattel con cabello extra largo hasta los tobillos." },
+        { id: 3, name: "Barbie Ponytail #1", collection_line: "Vintage Collection", release_year: 1959, estimated_min_price: 8500, lore: "El modelo original debutante en la Feria del Juguete de Nueva York en 1959." }
+      ];
 
-      const catalog = (data || []).map((item) => {
+      const catalog = sourceData.map((item) => {
         const estimatedPrice = calculateDynamicPrice(item);
         const loreText = (item.lore && item.lore.trim() !== '') 
           ? item.lore 
@@ -110,14 +121,15 @@ export default function App() {
 
       setMasterCatalog(catalog);
     } catch (e) {
-      console.error("Error al cargar el catálogo:", e);
+      console.error("Excepción en fetchMasterCatalog:", e);
     } finally {
       setLoading(false);
     }
   }
 
-  // 2. Cargar vitrina de usuario
+  // 2. CARGAR VITRINA DE USUARIO
   async function fetchUserData(userId) {
+    if (!supabase) return;
     try {
       const { data: colData } = await supabase
         .from('user_collections')
@@ -132,19 +144,12 @@ export default function App() {
           image_url: (!item.image_url || item.image_url.includes('unsplash')) ? DEFAULT_BARBIE_SILHOUETTE : item.image_url
         })));
       }
-
-      const { data: wishData } = await supabase
-        .from('user_wishlists')
-        .select('barbie_master_id')
-        .eq('user_id', userId);
-
-      if (wishData) setWishlist(wishData.map(w => w.barbie_master_id));
     } catch (e) {
-      console.error("Error al cargar datos del usuario:", e);
+      console.error("Error al cargar la vitrina del usuario:", e);
     }
   }
 
-  // 3. Abrir modal y guardar edición permanente en Supabase
+  // 3. EDITAR Y GUARDAR LORE PERMANENTE COMO ADMIN
   const handleOpenEditLore = (barbie) => {
     setEditingLoreItem(barbie);
     setAdminLoreForm({
@@ -162,7 +167,7 @@ export default function App() {
     const updatedLine = adminLoreForm.collection_line;
     const updatedYear = Number(adminLoreForm.release_year);
 
-    if (editingLoreItem.userInstanceId) {
+    if (supabase && editingLoreItem.userInstanceId) {
       await supabase
         .from('user_collections')
         .update({ 
@@ -180,7 +185,7 @@ export default function App() {
       ));
     }
 
-    if (editingLoreItem.id) {
+    if (supabase && editingLoreItem.id) {
       await supabase
         .from('barbies_master')
         .update({ 
@@ -189,21 +194,21 @@ export default function App() {
           release_year: updatedYear 
         })
         .eq('id', editingLoreItem.id);
-
-      setMasterCatalog(prev => prev.map(item => 
-        item.id === editingLoreItem.id 
-          ? { ...item, lore: updatedLore, collection_line: updatedLine, release_year: updatedYear }
-          : item
-      ));
     }
+
+    setMasterCatalog(prev => prev.map(item => 
+      item.id === editingLoreItem.id 
+        ? { ...item, lore: updatedLore, collection_line: updatedLine, release_year: updatedYear }
+        : item
+    ));
 
     setEditingLoreItem(null);
   };
 
-  // 4. Agregar a Mi Vitrina heredando el lore oficial
+  // 4. AÑADIR A MI VITRINA TRASLADANDO LA HISTORIA OFICIAL
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
-    if (!activeModal?.barbie || !session) return;
+    if (!activeModal?.barbie) return;
 
     const barbieSource = activeModal.barbie;
     const finalLore = (barbieSource.lore && barbieSource.lore.trim() !== '')
@@ -217,7 +222,7 @@ export default function App() {
     }
 
     const payload = {
-      user_id: session.user.id,
+      user_id: session?.user?.id || 'guest',
       barbie_master_id: barbieSource.id || null,
       name: barbieSource.name,
       collection_line: barbieSource.collection_line,
@@ -233,17 +238,18 @@ export default function App() {
         : `[HISTORIA OFICIAL]: ${finalLore}`
     };
 
-    const { error } = await supabase.from('user_collections').insert([payload]);
-    if (!error) {
+    if (supabase && session) {
+      await supabase.from('user_collections').insert([payload]);
       fetchUserData(session.user.id);
-      setActiveModal(null);
-      setUserBarbieForm({ quantity: 1, condition: 'NFRB (Caja Original Precintada)', customPrice: '', serialNumber: '', notes: '' });
     } else {
-      console.error("Error al añadir a la vitrina:", error);
+      setMyCollection(prev => [...prev, { ...payload, userInstanceId: Date.now() }]);
     }
+
+    setActiveModal(null);
+    setUserBarbieForm({ quantity: 1, condition: 'NFRB (Caja Original Precintada)', customPrice: '', serialNumber: '', notes: '' });
   };
 
-  // 5. Escáner con gemini-3.6-flash vía /api/scan
+  // 5. ESCÁNER DE IMAGEN IA (gemini-3.6-flash VIA SERVERLESS /api/scan)
   const handleScanImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -305,22 +311,18 @@ export default function App() {
     }
   };
 
-  // Filtrado de productos por búsqueda y por épocas
+  // FILTRADO DEL CATÁLOGO POR BÚSQUEDA Y ÉPOCAS
   const filteredMasterCatalog = masterCatalog.filter((barbie) => {
-    const matchesSearch = 
-      barbie.name.toLowerCase().includes(catalogSearchTerm.toLowerCase()) ||
-      (barbie.collection_line && barbie.collection_line.toLowerCase().includes(catalogSearchTerm.toLowerCase()));
+    const nameMatch = (barbie.name || '').toLowerCase().includes(catalogSearchTerm.toLowerCase());
+    const lineMatch = (barbie.collection_line || '').toLowerCase().includes(catalogSearchTerm.toLowerCase());
+    const matchesSearch = nameMatch || lineMatch;
 
-    const year = Number(barbie.release_year);
+    const year = Number(barbie.release_year) || 0;
     let matchesEra = true;
 
-    if (selectedEraFilter === 'Vintage (1959-1989)') {
-      matchesEra = year >= 1959 && year <= 1989;
-    } else if (selectedEraFilter === 'Modern / Y2K (1990-2009)') {
-      matchesEra = year >= 1990 && year <= 2009;
-    } else if (selectedEraFilter === 'Contemporánea (2010-Presente)') {
-      matchesEra = year >= 2010;
-    }
+    if (selectedEraFilter === 'Vintage (1959-1989)') matchesEra = year >= 1959 && year <= 1989;
+    if (selectedEraFilter === 'Modern / Y2K (1990-2009)') matchesEra = year >= 1990 && year <= 2009;
+    if (selectedEraFilter === 'Contemporánea (2010-Presente)') matchesEra = year >= 2010;
 
     return matchesSearch && matchesEra;
   });
@@ -383,7 +385,7 @@ export default function App() {
         {/* TAB: CATÁLOGO MAESTRO */}
         {activeTab === 'catalog' && (
           <section>
-            {/* CONTROLES DE FILTRADO */}
+            {/* BARRA DE BÚSQUEDA Y FILTRADO POR ÉPOCAS */}
             <div className="bg-gray-900 p-4 rounded-xl mb-6 border border-pink-900/40 flex flex-col md:flex-row gap-4 justify-between items-center shadow-lg">
               <div className="w-full md:w-1/2">
                 <input
