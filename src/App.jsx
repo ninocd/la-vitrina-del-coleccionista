@@ -474,6 +474,7 @@ export default function App() {
     }
   }
 
+  // MANEJADOR DE ESCÁNER VÍA VERCEL SERVERLESS API
   const handleScanImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -481,9 +482,6 @@ export default function App() {
     setScanning(true);
     setScanResult(null);
     setDebugError(null);
-
-    const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
-    const PROJECT_NUMBER = "919835647664";
 
     try {
       const reader = new FileReader();
@@ -493,64 +491,20 @@ export default function App() {
         setScannedImageBase64(fullBase64);
         const base64Data = fullBase64.split(',')[1];
 
-        const promptText = `
-          Actúa como perito experto en catalogación de muñecas Barbie de Mattel.
-          Analiza la fotografía y detecta el contorno exacto de la caja o muñeca.
-
-          Devuelve ÚNICAMENTE un objeto JSON en texto plano sin bloques markdown:
-          {
-            "detected_era": "Vintage / Moderna",
-            "box_2d": [ymin, xmin, ymax, xmax],
-            "primary_match": {
-              "name": "Nombre exacto del modelo",
-              "release_year": 1990,
-              "collection_line": "Línea de colección (ej. Fashionistas Inclusión, Collector)",
-              "estimated_min_price": 45,
-              "lore": "Historia completa, molde facial y variaciones entre edición americana y europea.",
-              "patent_marks": "Marcas de patente esperadas"
-            }
-          }
-        `;
-
-        const requestBody = {
-          contents: [{
-            role: "user",
-            parts: [
-              { text: promptText },
-              { inline_data: { mime_type: file.type || "image/jpeg", data: base64Data } }
-            ]
-          }]
-        };
-
-        let response;
-
-        if (GEMINI_API_KEY.startsWith("AQ.")) {
-          response = await fetch(
-            `https://us-central1-aiplatform.googleapis.com/v1/projects/${PROJECT_NUMBER}/locations/us-central1/publishers/google/models/gemini-1.5-flash:generateContent`,
-            {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${GEMINI_API_KEY.trim()}`
-              },
-              body: JSON.stringify(requestBody)
-            }
-          );
-        } else {
-          response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY.trim()}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(requestBody)
-            }
-          );
-        }
+        // Llamada a nuestro servidor interno en Vercel (/api/scan)
+        const response = await fetch('/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: base64Data,
+            mimeType: file.type || 'image/jpeg'
+          })
+        });
 
         const data = await response.json();
 
         if (!response.ok || data.error) {
-          setDebugError(`Error en API Gemini Vertex (${response.status}): ${data.error?.message || JSON.stringify(data.error)}`);
+          setDebugError(`Error en el servidor: ${data.error}`);
           setScanning(false);
           return;
         }
@@ -1225,7 +1179,7 @@ export default function App() {
 
               {scanning && (
                 <div className="mt-6 p-4 bg-zinc-950 rounded-2xl border border-zinc-800 text-xs font-mono text-pink-400 animate-pulse font-bold">
-                  Procesando imagen con Vertex AI, analizando contorno de caja y molde facial...
+                  Procesando imagen con Vertex AI vía Vercel Serverless...
                 </div>
               )}
 
