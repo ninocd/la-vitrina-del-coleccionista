@@ -3,9 +3,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
-  // Soporta ambas formas de nombrar la variable en Vercel
+  // Obtiene la clave configurada en las variables de Vercel
   const apiKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
-  const projectId = "919835647664";
 
   if (!apiKey) {
     return res.status(500).json({ error: 'Falta la clave API en las variables de entorno de Vercel.' });
@@ -41,13 +40,13 @@ export default async function handler(req, res) {
       }]
     };
 
+    // Petición directa usando el parámetro key en la URL para evitar el error de OAuth 2.0
     const response = await fetch(
-      `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/gemini-1.5-flash:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`,
       {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey.trim()}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestBody)
       }
@@ -56,7 +55,7 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: data.error?.message || 'Error en respuesta de Vertex AI' });
+      return res.status(response.status).json({ error: data.error?.message || 'Error en respuesta de Gemini API' });
     }
 
     return res.status(200).json(data);
