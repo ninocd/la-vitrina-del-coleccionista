@@ -8,7 +8,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const DEFAULT_BARBIE_SILHOUETTE = 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&q=80&w=600';
 
-// Función de respaldo por si el campo 'lore' está vacío en la base de datos
 function getBarbieLore(name, line, year) {
   return `Edición oficial de Mattel lanzada en ${year || 'año no especificado'}. Formó parte de la línea ${line || 'Colección General'}, siendo un elemento muy valorado por coleccionistas por su acabado detallado e impacto cultural.`;
 }
@@ -23,7 +22,7 @@ function calculateDynamicPrice(item) {
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('catalog'); // 'vitrina', 'scan', 'catalog', 'best_price'
+  const [activeTab, setActiveTab] = useState('catalog');
 
   // Datos
   const [masterCatalog, setMasterCatalog] = useState([]);
@@ -34,7 +33,7 @@ export default function App() {
   const [catalogSearchTerm, setCatalogSearchTerm] = useState('');
   const [selectedEraFilter, setSelectedEraFilter] = useState('Todas');
 
-  // Modal y Formularios
+  // Modales y Formularios
   const [activeModal, setActiveModal] = useState(null);
   const [editingLoreItem, setEditingLoreItem] = useState(null);
   const [adminLoreForm, setAdminLoreForm] = useState({ lore: '', collection_line: '', release_year: '' });
@@ -46,7 +45,7 @@ export default function App() {
     notes: ''
   });
 
-  // Estado del Escáner
+  // Escáner IA (gemini-3.6-flash)
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [scannedImageBase64, setScannedImageBase64] = useState(null);
@@ -72,7 +71,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 1. CARGA DEL CATÁLOGO MAESTRO (PRIORIDAD ABSOLUTA AL LORE DE SUPABASE)
+  // 1. Cargar catálogo maestro desde Supabase (lore prioritario)
   async function fetchMasterCatalog() {
     setLoading(true);
     try {
@@ -85,8 +84,6 @@ export default function App() {
 
       const catalog = (data || []).map((item) => {
         const estimatedPrice = calculateDynamicPrice(item);
-        
-        // REGLA DE ORO: Si Supabase tiene datos en la columna 'lore', SE USAN ESOS.
         const loreText = (item.lore && item.lore.trim() !== '') 
           ? item.lore 
           : getBarbieLore(item.name, item.collection_line, item.release_year);
@@ -111,7 +108,7 @@ export default function App() {
     }
   }
 
-  // 2. CARGA DE LA VITRINA DEL USUARIO
+  // 2. Cargar vitrina de usuario
   async function fetchUserData(userId) {
     try {
       const { data: colData } = await supabase
@@ -139,7 +136,7 @@ export default function App() {
     }
   }
 
-  // 3. EDITAR Y GUARDAR HISTORIA (ADMIN PERMANENTE EN SUPABASE)
+  // 3. Abrir modal y guardar edición permanente en Supabase
   const handleOpenEditLore = (barbie) => {
     setEditingLoreItem(barbie);
     setAdminLoreForm({
@@ -157,7 +154,6 @@ export default function App() {
     const updatedLine = adminLoreForm.collection_line;
     const updatedYear = Number(adminLoreForm.release_year);
 
-    // Guardar en user_collections si es un objeto de la vitrina
     if (editingLoreItem.userInstanceId) {
       await supabase
         .from('user_collections')
@@ -176,7 +172,6 @@ export default function App() {
       ));
     }
 
-    // Guardar en barbies_master (Catálogo Maestro Global)
     if (editingLoreItem.id) {
       await supabase
         .from('barbies_master')
@@ -197,7 +192,7 @@ export default function App() {
     setEditingLoreItem(null);
   };
 
-  // 4. AGREGAR DE CATÁLOGO A MI VITRINA (TRASLADA HISTORIA EXACTA)
+  // 4. Agregar a Mi Vitrina heredando el lore oficial
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie || !session) return;
@@ -240,7 +235,7 @@ export default function App() {
     }
   };
 
-  // 5. ESCÁNER DE IMAGEN IA CON GEMINI-3.6-FLASH
+  // 5. Escáner con gemini-3.6-flash vía /api/scan
   const handleScanImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -302,7 +297,7 @@ export default function App() {
     }
   };
 
-  // FILTRADO DEL CATÁLOGO POR BÚSQUEDA Y ÉPOCAS
+  // Filtrado de productos por búsqueda y por épocas
   const filteredMasterCatalog = masterCatalog.filter((barbie) => {
     const matchesSearch = 
       barbie.name.toLowerCase().includes(catalogSearchTerm.toLowerCase()) ||
