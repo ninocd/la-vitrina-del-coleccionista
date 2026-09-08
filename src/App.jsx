@@ -271,14 +271,25 @@ export default function App() {
   }, [session]);
 
   async function fetchUserData(userId) {
-    const { data: colData } = await supabase.from('user_collections').select('*').eq('user_id', userId);
-    if (colData) setMyCollection(colData.map(item => ({ 
-      ...item, 
-      userInstanceId: item.id,
-      image_url: (!item.image_url || item.image_url.includes('unsplash')) ? DEFAULT_BARBIE_SILHOUETTE : item.image_url
-    })));
+    const { data: colData } = await supabase
+      .from('user_collections')
+      .select('*')
+      .eq('user_id', userId);
 
-    const { data: wishData } = await supabase.from('user_wishlists').select('barbie_master_id').eq('user_id', userId);
+    if (colData) {
+      setMyCollection(colData.map(item => ({ 
+        ...item, 
+        userInstanceId: item.id,
+        lore: item.lore || getBarbieLore(item.name, item.collection_line, item.release_year),
+        image_url: (!item.image_url || item.image_url.includes('unsplash')) ? DEFAULT_BARBIE_SILHOUETTE : item.image_url
+      })));
+    }
+
+    const { data: wishData } = await supabase
+      .from('user_wishlists')
+      .select('barbie_master_id')
+      .eq('user_id', userId);
+
     if (wishData) setWishlist(wishData.map(w => w.barbie_master_id));
   }
 
@@ -580,7 +591,11 @@ export default function App() {
       );
     }
 
-    const finalLore = activeModal.barbie.lore || getBarbieLore(activeModal.barbie.name, activeModal.barbie.collection_line, activeModal.barbie.release_year);
+    // PRIORIDAD ABSOLUTA: Tomar la historia oficial editada en el catálogo.
+    // Solo si estuviera vacía por algún motivo, recurre a la función por defecto.
+    const finalLore = (activeModal.barbie.lore && activeModal.barbie.lore.trim() !== '')
+      ? activeModal.barbie.lore
+      : getBarbieLore(activeModal.barbie.name, activeModal.barbie.collection_line, activeModal.barbie.release_year);
     
     let finalPriceInEUR = activeModal.barbie.estimated_min_price || calculateDynamicPrice(activeModal.barbie);
     if (userBarbieForm.customPrice) {
@@ -599,7 +614,10 @@ export default function App() {
       quantity: Math.max(1, Number(userBarbieForm.quantity || 1)),
       condition: userBarbieForm.condition,
       serial_number: userBarbieForm.serialNumber || 'Sin registrar',
-      notes: userBarbieForm.notes ? `${userBarbieForm.notes}\n\n[HISTORIA OFICIAL]: ${finalLore}` : `[HISTORIA OFICIAL]: ${finalLore}`
+      lore: finalLore, // <--- Guardamos la historia editada en la columna lore de user_collections
+      notes: userBarbieForm.notes 
+        ? `${userBarbieForm.notes}\n\n[HISTORIA OFICIAL]: ${finalLore}` 
+        : `[HISTORIA OFICIAL]: ${finalLore}`
     };
 
     const { error } = await supabase.from('user_collections').insert([payload]);
@@ -607,7 +625,16 @@ export default function App() {
       fetchUserData(session.user.id);
       setActiveModal(null);
       setScannedImageBase64(null);
-      setUserBarbieForm({ quantity: 1, condition: 'NFRB (Caja Original Precintada)', customPrice: '', serialNumber: '', notes: '', allowPublicMedia: true });
+      setUserBarbieForm({ 
+        quantity: 1, 
+        condition: 'NFRB (Caja Original Precintada)', 
+        customPrice: '', 
+        serialNumber: '', 
+        notes: '', 
+        allowPublicMedia: true 
+      });
+    } else {
+      console.error("Error al añadir a la vitrina:", error);
     }
   };
 
