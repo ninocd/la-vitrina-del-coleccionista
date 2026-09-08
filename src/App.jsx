@@ -85,35 +85,59 @@ export default function App() {
     setLoading(true);
     try {
       let data = null;
-      
-      if (supabase) {
+
+      // Solo consultar Supabase si las credenciales están configuradas
+      if (supabaseUrl && supabaseAnonKey && supabase) {
         const res = await supabase
           .from('barbies_master')
           .select('*')
           .order('release_year', { ascending: true });
-        data = res.data;
+        if (!res.error && res.data && res.data.length > 0) {
+          data = res.data;
+        }
       }
 
-      // Si la base de datos está vacía o no responde, mostramos el catálogo base de ejemplo
-      const sourceData = (data && data.length > 0) ? data : [
-        { id: 1, name: "Barbie Extra Millennial Pink", collection_line: "Barbie Extra", release_year: 2020, estimated_min_price: 45, lore: "Edición moderna con abrigo rosa de pelo sintético y mascota." },
-        { id: 2, name: "Barbie Totally Hair", collection_line: "Totally Hair", release_year: 1992, estimated_min_price: 120, lore: "La Barbie más vendida de la historia de Mattel con cabello extra largo hasta los tobillos." },
-        { id: 3, name: "Barbie Ponytail #1", collection_line: "Vintage Collection", release_year: 1959, estimated_min_price: 8500, lore: "El modelo original debutante en la Feria del Juguete de Nueva York en 1959." }
+      // Si Supabase falla o no está conectado, usar el catálogo oficial integrado
+      const fallbackCatalog = [
+        {
+          id: 1,
+          name: "Barbie Extra #1 Millennial Pink",
+          collection_line: "Barbie Extra",
+          release_year: 2020,
+          estimated_min_price: 45,
+          image_url: "https://m.media-amazon.com/images/I/71wK8nS3f3L._AC_SL1500_.jpg",
+          lore: "Edición moderna con abrigo rosa de pelo sintético, peinado afro con mechas rosas y su mascota cerdito con alas de unicornio."
+        },
+        {
+          id: 2,
+          name: "Barbie Totally Hair Blonde",
+          collection_line: "Totally Hair",
+          release_year: 1992,
+          estimated_min_price: 120,
+          image_url: "https://m.media-amazon.com/images/I/81P2uJpWkyL._AC_SL1500_.jpg",
+          lore: "La Barbie más vendida de la historia de Mattel. Destaca por su icónico vestido psicodélico de los 90 y su melena rubia extra larga hasta los tobillos."
+        },
+        {
+          id: 3,
+          name: "Barbie Ponytail #1 Original",
+          collection_line: "Vintage Collection",
+          release_year: 1959,
+          estimated_min_price: 8500,
+          image_url: "https://m.media-amazon.com/images/I/71Y+vX8J1iL._AC_SL1500_.jpg",
+          lore: "El modelo original debutante en la Feria del Juguete de Nueva York en 1959. Vestido con traje de baño a rayas blancas y negras y peinado en coleta."
+        }
       ];
 
-      const catalog = sourceData.map((item) => {
+      const finalData = data || fallbackCatalog;
+
+      const catalog = finalData.map((item) => {
         const estimatedPrice = calculateDynamicPrice(item);
         const loreText = (item.lore && item.lore.trim() !== '') 
           ? item.lore 
           : getBarbieLore(item.name, item.collection_line, item.release_year);
 
-        const cleanImageUrl = (!item.image_url || item.image_url.includes('unsplash')) 
-          ? DEFAULT_BARBIE_SILHOUETTE 
-          : item.image_url;
-
         return { 
           ...item, 
-          image_url: cleanImageUrl, 
           estimated_min_price: estimatedPrice, 
           lore: loreText 
         };
@@ -121,7 +145,7 @@ export default function App() {
 
       setMasterCatalog(catalog);
     } catch (e) {
-      console.error("Excepción en fetchMasterCatalog:", e);
+      console.error("Error al cargar el catálogo:", e);
     } finally {
       setLoading(false);
     }
