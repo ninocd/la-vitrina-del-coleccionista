@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// Configuración de Supabase
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Evita que la app colapse si la URL de Supabase aún no está cargada
+export const supabase = (supabaseUrl && supabaseAnonKey) 
+  ? createClient(supabaseUrl, supabaseAnonKey) 
+  : null;
 
 const DEFAULT_BARBIE_SILHOUETTE = 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&q=80&w=600';
 
@@ -56,6 +59,12 @@ export default function App() {
   const exchangeRateUSD = 1.08;
 
   useEffect(() => {
+    if (!supabase) {
+      console.warn("Supabase no está configurado. Verifica las variables VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.");
+      setLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) fetchUserData(session.user.id);
@@ -67,7 +76,6 @@ export default function App() {
     });
 
     fetchMasterCatalog();
-
     return () => subscription.unsubscribe();
   }, []);
 
