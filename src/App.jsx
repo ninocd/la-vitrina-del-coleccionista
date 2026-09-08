@@ -352,28 +352,45 @@ export default function App() {
     const updatedLine = adminLoreForm.collection_line;
     const updatedYear = Number(adminLoreForm.release_year);
 
+    // A) Si estamos editando una muñeca que está en "Mi Vitrina" (user_collections)
     if (editingLoreItem.userInstanceId) {
-      await supabase
+      const { error: userColErr } = await supabase
         .from('user_collections')
-        .update({ notes: `[HISTORIA OFICIAL]: ${updatedLore}`, collection_line: updatedLine, release_year: updatedYear })
+        .update({ 
+          lore: updatedLore, 
+          notes: `[HISTORIA OFICIAL]: ${updatedLore}`, 
+          collection_line: updatedLine, 
+          release_year: updatedYear 
+        })
         .eq('id', editingLoreItem.userInstanceId);
 
-      setMyCollection(prev => prev.map(item => 
-        item.userInstanceId === editingLoreItem.userInstanceId 
-          ? { ...item, lore: updatedLore, collection_line: updatedLine, release_year: updatedYear, notes: `[HISTORIA OFICIAL]: ${updatedLore}` }
-          : item
-      ));
+      if (!userColErr) {
+        setMyCollection(prev => prev.map(item => 
+          item.userInstanceId === editingLoreItem.userInstanceId 
+            ? { ...item, lore: updatedLore, collection_line: updatedLine, release_year: updatedYear, notes: `[HISTORIA OFICIAL]: ${updatedLore}` }
+            : item
+        ));
+      }
     }
 
+    // B) Si estamos editando el Catálogo Maestro global (barbies_master)
     if (editingLoreItem.id) {
-      await supabase
+      const { error: masterErr } = await supabase
         .from('barbies_master')
-        .update({ collection_line: updatedLine, release_year: updatedYear })
+        .update({ 
+          lore: updatedLore,
+          collection_line: updatedLine, 
+          release_year: updatedYear 
+        })
         .eq('id', editingLoreItem.id);
 
-      setMasterCatalog(prev => prev.map(item => 
-        item.id === editingLoreItem.id ? { ...item, lore: updatedLore, collection_line: updatedLine, release_year: updatedYear } : item
-      ));
+      if (!masterErr) {
+        setMasterCatalog(prev => prev.map(item => 
+          item.id === editingLoreItem.id 
+            ? { ...item, lore: updatedLore, collection_line: updatedLine, release_year: updatedYear } 
+            : item
+        ));
+      }
     }
 
     setEditingLoreItem(null);
@@ -457,18 +474,28 @@ export default function App() {
 
       const catalog = (data || []).map((item) => {
         const estimatedPrice = calculateDynamicPrice(item);
-        const loreText = getBarbieLore(item.name, item.collection_line, item.release_year);
+        
+        // REGLA DE ORO: Si existe lore guardado en la BD (editado por el admin), SE USA ESE.
+        // Solo si la casilla en Supabase está vacía o es null, genera una por defecto.
+        const loreText = (item.lore && item.lore.trim() !== '') 
+          ? item.lore 
+          : getBarbieLore(item.name, item.collection_line, item.release_year);
         
         const cleanImageUrl = (!item.image_url || item.image_url.includes('unsplash')) 
           ? DEFAULT_BARBIE_SILHOUETTE 
           : item.image_url;
 
-        return { ...item, image_url: cleanImageUrl, estimated_min_price: estimatedPrice, lore: loreText };
+        return { 
+          ...item, 
+          image_url: cleanImageUrl, 
+          estimated_min_price: estimatedPrice, 
+          lore: loreText 
+        };
       });
 
       setMasterCatalog(catalog);
     } catch (e) {
-      console.error(e);
+      console.error("Error al cargar catálogo maestro:", e);
     } finally {
       setLoading(false);
     }
