@@ -6,10 +6,8 @@ const supabaseUrl = 'https://ytrxlbhcfxnwfqttupvw.supabase.co'
 const supabaseAnonKey = 'sb_publishable_drgo1aaGYqTmdHOaCIA1CQ_Z3ngfXeD'
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// SILUETA VECTORIAL BARBIE
 const DEFAULT_BARBIE_SILHOUETTE = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' width='100%' height='100%' fill='%23ec4899'><rect width='200' height='200' fill='%2318181b'/><circle cx='100' cy='100' r='85' fill='%2327272a' stroke='%23ec4899' stroke-width='3'/><path d='M115,45 C100,45 88,55 85,68 C80,66 75,68 72,72 C68,78 70,86 75,90 C70,95 68,102 70,108 C73,115 80,118 85,116 C88,122 95,126 102,125 C100,132 98,142 122,122 C128,118 132,110 130,102 C128,95 122,90 118,90 C122,82 120,72 114,66 C120,60 122,50 115,45 Z' fill='%23f472b6' opacity='0.9'/><path d='M100,158 C120,158 135,148 140,138 C128,144 112,145 100,140 C88,145 72,144 60,138 C65,148 80,158 100,158 Z' fill='%23ec4899'/></svg>";
 
-// PROCESAMIENTO INTELIGENTE DE FOTO
 const processImageWithWhiteBackgroundAndBase = (base64Img, condition = '', box = null) => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -99,21 +97,18 @@ export default function App() {
   const [currentView, setCurrentView] = useState('vitrina');
   const [masterCatalog, setMasterCatalog] = useState([]);
   const [myCollection, setMyCollection] = useState([]);
-  const [wishlist, setWishlist] = useState([]);
+  const [, setWishlist] = useState([]);
   
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // PRIVACIDAD Y COMPARTICIÓN
   const [isProfilePublic, setIsProfilePublic] = useState(true);
   const [shareImageRights, setShareImageRights] = useState(true);
 
-  // MULTI-IDIOMA Y DIVISA
   const [lang, setLang] = useState('ES'); 
   const [currency, setCurrency] = useState('EUR'); 
   const exchangeRateUSD = 1.08; 
 
-  // AUTENTICACIÓN
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState('login');
   const [authForm, setAuthForm] = useState({ email: '', password: '' });
@@ -122,17 +117,14 @@ export default function App() {
   const [authSuccessMsg, setAuthSuccessMsg] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // MODALES Y VISORES
   const [activeModal, setActiveModal] = useState(null);
   const [zoomedImage, setZoomedImage] = useState(null); 
   const [expandedInfoItem, setExpandedInfoItem] = useState(null); 
   const [expandedCards, setExpandedCards] = useState({}); 
 
-  // EDITOR DE ADMIN
   const [editingLoreItem, setEditingLoreItem] = useState(null);
   const [adminLoreForm, setAdminLoreForm] = useState({ lore: '', collection_line: '', release_year: '' });
 
-  // EDICIÓN DE PRECIO
   const [editingPriceId, setEditingPriceId] = useState(null);
   const [tempPriceValue, setTempPriceValue] = useState('');
 
@@ -156,13 +148,11 @@ export default function App() {
   const [adCopyText, setAdCopyText] = useState('');
   const [copiedStatus, setCopiedStatus] = useState(false);
   
-  // ESCÁNER
   const [scanResult, setScanResult] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [debugError, setDebugError] = useState(null);
   const [scannedImageBase64, setScannedImageBase64] = useState(null);
 
-  // TRADUCCIONES
   const t = {
     ES: {
       title: "LA VITRINA",
@@ -222,7 +212,6 @@ export default function App() {
     }
   }[lang];
 
-  // DIRECTORIO
   const directoryMembers = [
     {
       handle: "@chicledefresadolls",
@@ -485,17 +474,16 @@ export default function App() {
     }
   }
 
- // SE LEE DESDE VARIABLE DE ENTORNO O FALLBACK SEGURO
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
-const PROJECT_NUMBER = "919835647664";
+  const handleScanImage = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
     setScanning(true);
     setScanResult(null);
     setDebugError(null);
 
-   // LÍNEA DE LA CLAVE EN handleScanImage
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
-const PROJECT_NUMBER = "919835647664";
+    const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
+    const PROJECT_NUMBER = "919835647664";
 
     try {
       const reader = new FileReader();
@@ -536,7 +524,6 @@ const PROJECT_NUMBER = "919835647664";
 
         let response;
 
-        // SI ES CLAVE GCP (AQ.Ab8...), ATACAMOS VERTEX AI ENDPOINT
         if (GEMINI_API_KEY.startsWith("AQ.")) {
           response = await fetch(
             `https://us-central1-aiplatform.googleapis.com/v1/projects/${PROJECT_NUMBER}/locations/us-central1/publishers/google/models/gemini-1.5-flash:generateContent`,
@@ -550,7 +537,6 @@ const PROJECT_NUMBER = "919835647664";
             }
           );
         } else {
-          // SI ES CLAVE AI STUDIO (AIzaSy...)
           response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY.trim()}`,
             {
@@ -769,7 +755,6 @@ const PROJECT_NUMBER = "919835647664";
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-200 pb-12 font-sans">
       
-      {/* VISOR DE FOTO */}
       {zoomedImage && (
         <div 
           onClick={() => setZoomedImage(null)} 
@@ -794,7 +779,6 @@ const PROJECT_NUMBER = "919835647664";
         </div>
       )}
 
-      {/* EDITOR DE ADMIN */}
       {editingLoreItem && (
         <div className="fixed inset-0 bg-zinc-950/90 backdrop-blur-md flex justify-center items-center p-4 z-50">
           <div className="bg-zinc-900 border border-pink-900/50 p-6 rounded-3xl max-w-xl w-full shadow-2xl text-zinc-100">
@@ -848,7 +832,6 @@ const PROJECT_NUMBER = "919835647664";
         </div>
       )}
 
-      {/* VISOR MODAL CON LENTE DE AUMENTO */}
       {expandedInfoItem && (
         <div className="fixed inset-0 bg-zinc-950/90 backdrop-blur-md flex justify-center items-center p-4 z-50">
           <div className="bg-zinc-900 border border-pink-900/40 p-6 rounded-3xl max-w-2xl w-full shadow-2xl text-zinc-100 max-h-[90vh] overflow-y-auto relative">
@@ -904,7 +887,6 @@ const PROJECT_NUMBER = "919835647664";
         </div>
       )}
 
-      {/* Header Grafito */}
       <header className="bg-zinc-900/90 border-b border-pink-950/50 sticky top-0 z-40 backdrop-blur-md shadow-sm print:hidden py-2">
         <div className="max-w-7xl mx-auto px-6 py-2 flex flex-col md:flex-row justify-between items-center gap-4">
           
@@ -923,7 +905,6 @@ const PROJECT_NUMBER = "919835647664";
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-2">
-            
             <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800">
               <button 
                 onClick={() => setLang(lang === 'ES' ? 'EN' : 'ES')}
@@ -995,10 +976,8 @@ const PROJECT_NUMBER = "919835647664";
         </div>
       </header>
 
-      {/* Main Container */}
       <main className="max-w-7xl mx-auto px-6 mt-4 print:m-0 print:p-0">
         
-        {/* VISTA MI VITRINA */}
         {currentView === 'vitrina' && (
           <div>
             <div className="mb-5 bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4">
@@ -1050,7 +1029,6 @@ const PROJECT_NUMBER = "919835647664";
                   return (
                     <div key={item.userInstanceId} className="bg-zinc-900/90 rounded-3xl p-4 border border-zinc-800/80 flex flex-col justify-between transition-all hover:border-pink-900/50 hover:shadow-xl">
                       <div>
-                        
                         <div 
                           className="relative group cursor-pointer mb-3 overflow-hidden rounded-2xl bg-white p-2 border border-zinc-800/80 h-56 flex items-center justify-center"
                           style={{ perspective: '1000px' }}
@@ -1206,7 +1184,6 @@ const PROJECT_NUMBER = "919835647664";
           </div>
         )}
 
-        {/* VISTA CAPTURA DE BARBIE */}
         {currentView === 'scanner' && (
           <div className="max-w-xl mx-auto">
             <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl mb-6 text-center">
@@ -1305,7 +1282,6 @@ const PROJECT_NUMBER = "919835647664";
           </div>
         )}
 
-        {/* VISTA LOS COLECCIONISTAS */}
         {currentView === 'directorio' && (
           <div className="max-w-5xl mx-auto">
             <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl mb-6 text-center">
@@ -1366,7 +1342,6 @@ const PROJECT_NUMBER = "919835647664";
           </div>
         )}
 
-        {/* VISTA AL MEJOR PRECIO */}
         {currentView === 'chollos' && (
           <div>
             <div className="mb-6 bg-zinc-900 border border-zinc-800 p-6 rounded-3xl">
@@ -1415,7 +1390,6 @@ const PROJECT_NUMBER = "919835647664";
           </div>
         )}
 
-        {/* VISTA CATÁLOGO */}
         {currentView === 'catalog' && (
           <div>
             <div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -1477,7 +1451,6 @@ const PROJECT_NUMBER = "919835647664";
 
       </main>
 
-      {/* MODAL VENDER */}
       {activeModal?.type === 'calculator' && (
         <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm flex justify-center items-center p-4 z-50">
           <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl max-w-md w-full shadow-2xl text-zinc-100">
@@ -1548,7 +1521,6 @@ const PROJECT_NUMBER = "919835647664";
         </div>
       )}
 
-      {/* MODAL GENERADOR ANUNCIOS */}
       {activeModal?.type === 'adGenerator' && (
         <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm flex justify-center items-center p-4 z-50">
           <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl max-w-lg w-full shadow-2xl text-zinc-100">
@@ -1583,7 +1555,6 @@ const PROJECT_NUMBER = "919835647664";
         </div>
       )}
 
-      {/* MODAL INFORMES Y CERTIFICADOS */}
       {activeModal?.type === 'exportPDF' && (
         <div className="fixed inset-0 bg-zinc-950/90 backdrop-blur-md flex justify-center items-center p-4 z-50 print:p-0 print:bg-white print:fixed print:inset-0">
           <div className="bg-white p-8 rounded-3xl max-w-3xl w-full shadow-2xl text-zinc-900 max-h-[90vh] overflow-y-auto print:max-h-none print:shadow-none print:rounded-none">
@@ -1646,7 +1617,6 @@ const PROJECT_NUMBER = "919835647664";
         </div>
       )}
 
-      {/* MODAL REGISTRO ACTIVO */}
       {activeModal?.type === 'add' && (
         <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm flex justify-center items-center p-4 z-50">
           <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl max-w-sm w-full shadow-2xl text-zinc-100">
