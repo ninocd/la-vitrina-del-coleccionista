@@ -79,7 +79,7 @@ export default function App() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // ESTADO INSPECTOR VITRINA 3D CON ANIMACIÓN DE ENTRADA Y SALIDA
+  // INSPECTOR DE VITRINA Y ESTADO DE PUERTAS
   const [showVitrinaDoorsModal, setShowVitrinaDoorsModal] = useState(false);
   const [doorsOpened, setDoorsOpened] = useState(false);
   const [selectedVitrinaDoll, setSelectedVitrinaDoll] = useState(null);
@@ -95,7 +95,7 @@ export default function App() {
   const [catalogSearchTerm, setCatalogSearchTerm] = useState('');
   const [selectedEraFilter, setSelectedEraFilter] = useState('Todas');
 
-  // Modales y Formularios con Edición de Nombre
+  // Modales y Formularios
   const [editingLoreItem, setEditingLoreItem] = useState(null);
   const [certificateItem, setCertificateItem] = useState(null);
   const [comparePriceItem, setComparePriceItem] = useState(null);
@@ -218,7 +218,7 @@ export default function App() {
     });
   };
 
-  // APERTURA DE VITRINA CON PUERTAS
+  // APERTURA DE INSPECTOR
   const handleOpenVitrinaDoll = (barbie) => {
     setSelectedVitrinaDoll(barbie);
     setDoorsOpened(false);
@@ -228,13 +228,13 @@ export default function App() {
     }, 150);
   };
 
-  // CIERRE DE VITRINA EN 2 PASOS (PRIMERO SE CIERRAN LAS PUERTAS, LUEGO DESAPARECE EL MODAL)
+  // CIERRE DE INSPECTOR EN 2 PASOS (CIERRA PUERTAS PRIMERO)
   const handleCloseVitrinaDoll = () => {
     setDoorsOpened(false);
     setTimeout(() => {
       setShowVitrinaDoorsModal(false);
       setSelectedVitrinaDoll(null);
-    }, 500); // Coincide con la transición CSS
+    }, 450);
   };
 
   const handleOpenEditLore = (barbie) => {
@@ -503,24 +503,49 @@ export default function App() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {myCollection.map((item) => (
-                  <div key={item.userInstanceId || item.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between">
+                  <div key={item.userInstanceId || item.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between group">
                     <div>
-                      {/* CLIC EN FOTO APERTA LA VITRINA */}
+                      {/* CAJA DE VITRINA 3D EN LA VISTA PRINCIPAL CON PUERTAS DE CRISTAL ACTIVAS */}
                       <div 
                         onClick={() => handleOpenVitrinaDoll(item)}
-                        className="h-40 bg-gray-950 p-2 flex items-center justify-center relative cursor-pointer group"
+                        className="h-44 bg-gradient-to-b from-pink-950/30 via-black to-gray-950 p-2 flex items-center justify-center relative cursor-pointer overflow-hidden border-b border-gray-800"
+                        style={{ perspective: '600px' }}
                       >
+                        {/* ILUMINACIÓN INTERIOR DE FOCO */}
+                        <div className="absolute top-0 w-24 h-24 bg-pink-500/20 rounded-full blur-lg pointer-events-none"></div>
+
+                        {/* MUÑECA DENTRO DE LA VITRINA */}
                         {item.image_url ? (
-                          <img src={item.image_url} alt={item.name} className="max-h-full object-contain rounded-md transition group-hover:scale-105" />
+                          <img src={item.image_url} alt={item.name} className="max-h-full object-contain rounded-md transition duration-500 group-hover:scale-105 filter drop-shadow-[0_4px_6px_rgba(236,72,153,0.3)] z-10" />
                         ) : (
                           <BarbieSilhouetteFallback />
                         )}
-                        <span className="absolute top-1.5 left-1.5 bg-gray-900/90 text-gray-300 text-[8px] px-1.5 py-0.5 rounded font-bold">
+
+                        {/* ESTANTE DE CRISTAL INFERIOR */}
+                        <div className="absolute bottom-2 w-3/4 h-1 bg-gradient-to-r from-transparent via-pink-400/40 to-transparent rounded-full blur-[1px]"></div>
+
+                        {/* PUERTA IZQUIERDA DE CRISTAL (SE ABRE AL PASAR EL CURSOR O TOCAR) */}
+                        <div 
+                          className="absolute top-0 left-0 w-1/2 h-full bg-pink-400/10 border-r border-white/40 backdrop-blur-[1px] transition-transform duration-500 ease-in-out origin-left flex items-center justify-end pr-1 pointer-events-none z-20 group-hover:-rotate-y-100"
+                          style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
+                        >
+                          <div className="w-1 h-8 bg-white/40 rounded-full shadow"></div>
+                        </div>
+
+                        {/* PUERTA DERECHA DE CRISTAL (SE ABRE AL PASAR EL CURSOR O TOCAR) */}
+                        <div 
+                          className="absolute top-0 right-0 w-1/2 h-full bg-pink-400/10 border-l border-white/40 backdrop-blur-[1px] transition-transform duration-500 ease-in-out origin-right flex items-center justify-start pl-1 pointer-events-none z-20 group-hover:rotate-y-100"
+                          style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
+                        >
+                          <div className="w-1 h-8 bg-white/40 rounded-full shadow"></div>
+                        </div>
+
+                        <span className="absolute top-1.5 left-1.5 bg-gray-900/90 text-gray-300 text-[8px] px-1.5 py-0.5 rounded font-bold z-30">
                           {item.condition || 'NIB'}
                         </span>
                       </div>
 
-                      {/* CLIC EN NOMBRE O LORE APERTA LA VITRINA */}
+                      {/* TEXTOS DE LA MUÑECA */}
                       <div className="p-2.5">
                         <p className="text-[9px] text-pink-400 font-bold uppercase truncate">{item.collection_line}</p>
                         <h3 
@@ -772,7 +797,7 @@ export default function App() {
 
       </main>
 
-      {/* MODAL 3D: VITRINA CON ANIMACIÓN COMPLETA DE ENTRADA/SALIDA Y TAMAÑO ADAPTADO A PC */}
+      {/* MODAL 3D: INSPECTOR DE VITRINA AMPLIO CON ANIMACIÓN DE ENTRADA Y SALIDA */}
       {showVitrinaDoorsModal && selectedVitrinaDoll && (
         <div 
           onClick={handleCloseVitrinaDoll}
@@ -783,7 +808,7 @@ export default function App() {
             className="relative w-full max-w-sm bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 border-2 border-pink-900/60 rounded-2xl overflow-hidden shadow-2xl p-3 my-auto max-h-[85vh] flex flex-col justify-between"
           >
             
-            {/* BOTÓN DE CIERRE CON CIERRE DE VITRINA EN 2 PASOS */}
+            {/* BOTÓN DE CIERRE CON SECUENCIA DE APERTURA/CIERRE DE PUERTAS */}
             <button 
               onClick={handleCloseVitrinaDoll}
               className="absolute top-2 right-2 text-gray-300 hover:text-white font-black text-xs bg-gray-900/90 rounded-full w-7 h-7 flex items-center justify-center z-50 border border-gray-700 shadow-md transition hover:bg-pink-600"
@@ -791,7 +816,7 @@ export default function App() {
               ✕
             </button>
 
-            {/* CONTENEDOR VITRINA CON PERSPECTIVA Y PUERTAS DE CRISTAL */}
+            {/* CAJA DE VITRINA 3D */}
             <div 
               className="relative w-full h-60 bg-gradient-to-b from-pink-950/40 via-black to-gray-950 rounded-xl overflow-hidden border border-pink-500/30 flex items-center justify-center mb-3 shrink-0"
               style={{ perspective: '900px' }}
@@ -836,7 +861,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* DETALLES DE LA BARBIE CON SCROLL INTERNO SI ES LARGA */}
+            {/* DETALLES DE LA BARBIE */}
             <div className="text-left bg-gray-950/90 p-2.5 rounded-xl border border-pink-900/40 overflow-y-auto max-h-36">
               <span className="text-[8px] text-pink-400 font-extrabold uppercase tracking-widest">{selectedVitrinaDoll.collection_line} ({selectedVitrinaDoll.release_year})</span>
               <h3 className="text-xs font-black text-white mt-0.5 leading-snug">{selectedVitrinaDoll.name}</h3>
