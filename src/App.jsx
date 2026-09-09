@@ -10,7 +10,7 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
 
-// Componente de Silueta SVG de Barbie por defecto si no hay imagen (Evita Unsplash / fotos aleatorias)
+// Componente de Silueta SVG de Barbie por defecto (Sustituye cualquier foto aleatoria)
 const BarbieSilhouetteFallback = () => (
   <div className="w-full h-full bg-gradient-to-b from-gray-900 to-pink-950 flex flex-col items-center justify-center p-4 rounded-lg border border-pink-900/30">
     <svg className="w-20 h-20 text-pink-500/40 mb-2" viewBox="0 0 24 24" fill="currentColor">
@@ -40,11 +40,11 @@ export default function App() {
   const [masterCatalog, setMasterCatalog] = useState([]);
   const [myCollection, setMyCollection] = useState([]);
 
-  // Perfiles de Probadores Beta
+  // Perfiles Reales de Coleccionistas y Probadores
   const betaTesters = [
-    { id: 1, name: "Eduardo C.", role: "Administrador & Lead Collector", pieces: 142, badge: "Master Curator", avatar: "👑" },
-    { id: 2, name: "Forteza S.", role: "Especialista Vintage & COA", pieces: 98, badge: "Vintage Expert", avatar: "📜" },
-    { id: 3, name: "Valeria M.", role: "Analista de Mercado & NFRB", pieces: 75, badge: "Market Analyst", avatar: "📈" }
+    { id: 1, handle: "@chicledefresadolls", role: "Especialista en Fotografía & Curaduría", badge: "Verified Collector", avatar: "🎀" },
+    { id: 2, handle: "@barbiedecoleccionenespanol", role: "Historiador de Lore & Ediciones Vintage", badge: "Vintage Archivist", avatar: "👑" },
+    { id: 3, handle: "@pm_collectibles", role: "Analista de Mercado & NFRB/MIB", badge: "Market Specialist", avatar: "💎" }
   ];
 
   // Filtros del Catálogo
@@ -118,7 +118,6 @@ export default function App() {
           ? item.lore 
           : getBarbieLoreFallback(item.name, item.collection_line, item.release_year);
 
-        // Si la imagen es nula, vacía o apunta a unsplash, se deja en null para forzar la silueta
         const validImage = (item.image_url && !item.image_url.includes('unsplash')) ? item.image_url : null;
 
         return { 
@@ -159,7 +158,7 @@ export default function App() {
     }
   }
 
-  // CÁLCULO DE VALOR TOTAL
+  // CÁLCULO DE VALOR TOTAL DE LA COLECCIÓN
   const totalCollectionValueEUR = myCollection.reduce((acc, item) => {
     const qty = item.quantity || 1;
     const price = item.estimated_min_price || 0;
@@ -438,7 +437,6 @@ export default function App() {
         {/* TAB: CATÁLOGO MAESTRO */}
         {activeTab === 'catalog' && (
           <section>
-            {/* BARRA DE BÚSQUEDA Y FILTRO DE ÉPOCAS */}
             <div className="bg-gray-900 p-4 rounded-xl mb-6 border border-pink-900/40 flex flex-col md:flex-row gap-4 justify-between items-center shadow-lg">
               <div className="w-full md:w-1/2">
                 <input
@@ -465,7 +463,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* GRILLA DE TARJETAS */}
             {loading ? (
               <div className="text-center py-12 text-pink-400 font-bold animate-pulse">Cargando catálogo desde Supabase...</div>
             ) : (
@@ -678,24 +675,23 @@ export default function App() {
           </section>
         )}
 
-        {/* TAB: COMUNIDAD DE COLECCIONISTAS & PROBADORES BETA */}
+        {/* TAB: COMUNIDAD DE COLECCIONISTAS REALES */}
         {activeTab === 'community' && (
           <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
             <h2 className="text-xl font-bold text-pink-500 mb-2">Comunidad & Perfiles de Probadores Beta</h2>
-            <p className="text-xs text-gray-400 mb-6">Red de coleccionistas verificados y miembros del equipo de catalogación.</p>
+            <p className="text-xs text-gray-400 mb-6">Red de coleccionistas verificados y colaboradores de catalogación.</p>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {betaTesters.map((tester) => (
-                <div key={tester.id} className="bg-gray-950 p-5 rounded-xl border border-gray-800 flex flex-col items-center text-center shadow-lg">
+                <div key={tester.id} className="bg-gray-950 p-5 rounded-xl border border-gray-800 flex flex-col items-center text-center shadow-lg hover:border-pink-500/40 transition">
                   <div className="w-16 h-16 bg-pink-950/80 border border-pink-500/40 rounded-full flex items-center justify-center text-3xl mb-3">
                     {tester.avatar}
                   </div>
-                  <h3 className="font-extrabold text-white text-base">{tester.name}</h3>
+                  <h3 className="font-extrabold text-pink-400 text-base">{tester.handle}</h3>
                   <span className="mt-1 bg-pink-900/50 text-pink-300 text-[10px] font-bold px-2 py-0.5 rounded border border-pink-700/50">
                     {tester.badge}
                   </span>
-                  <p className="text-xs text-gray-400 mt-2">{tester.role}</p>
-                  <p className="text-xs text-pink-400 font-bold mt-3">{tester.pieces} muñecas catalogadas</p>
+                  <p className="text-xs text-gray-300 mt-3 font-medium">{tester.role}</p>
                 </div>
               ))}
             </div>
