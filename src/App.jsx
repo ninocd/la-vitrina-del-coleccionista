@@ -223,8 +223,7 @@ export default function App() {
     setSelectedVitrinaDoll(barbie);
     setDoorsOpened(false);
     setShowVitrinaDoorsModal(true);
-    // Dispara apertura de puertas tras montar el cristal
-    setTimeout(() => setDoorsOpened(true), 300);
+    setTimeout(() => setDoorsOpened(true), 200);
   };
 
   const handleOpenEditLore = (barbie) => {
@@ -247,7 +246,6 @@ export default function App() {
     const updatedLine = adminLoreForm.collection_line;
     const updatedYear = Number(adminLoreForm.release_year);
 
-    // 1. Guardar en user_collection
     if (editingLoreItem.userInstanceId && supabase) {
       const { error: userErr } = await supabase
         .from('user_collection')
@@ -262,7 +260,6 @@ export default function App() {
       if (userErr) console.error("Error al actualizar user_collection:", userErr);
     }
 
-    // 2. Guardar en barbies_master
     const masterId = editingLoreItem.barbie_id || editingLoreItem.barbie_master_id || editingLoreItem.id;
     if (masterId && supabase) {
       const { error: masterErr } = await supabase
@@ -278,7 +275,7 @@ export default function App() {
       if (masterErr) console.error("Error al actualizar barbies_master:", masterErr);
     }
 
-    await fetchData(); // Sincroniza desde la BD
+    await fetchData();
     setEditingLoreItem(null);
   };
 
@@ -497,7 +494,7 @@ export default function App() {
                 {myCollection.map((item) => (
                   <div key={item.userInstanceId || item.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between">
                     <div>
-                      {/* ÁREA PULSABLE QUE ABRE LAS PUERTAS DE LA VITRINA */}
+                      {/* ÁREA PULSABLE PARA ABRIR VITRINA */}
                       <div 
                         onClick={() => handleOpenVitrinaDoors(item)}
                         className="h-40 bg-gray-950 p-2 flex items-center justify-center relative cursor-pointer group"
@@ -777,8 +774,11 @@ export default function App() {
               ✕
             </button>
 
-            {/* CONTENEDOR 3D CON FOCO Y ESTANTE */}
-            <div className="relative w-full h-80 bg-gradient-to-b from-pink-950/30 to-black rounded-xl overflow-hidden border border-pink-500/30 flex items-center justify-center mb-4">
+            {/* CONTENEDOR 3D CON PERSPECTIVA Y PUERTAS DE CRISTAL */}
+            <div 
+              className="relative w-full h-80 bg-gradient-to-b from-pink-950/30 to-black rounded-xl overflow-hidden border border-pink-500/30 flex items-center justify-center mb-4"
+              style={{ perspective: '1000px' }}
+            >
               
               {/* LUZ DE FOCO DE VITRINA */}
               <div className="absolute top-0 w-32 h-32 bg-pink-500/20 rounded-full blur-2xl pointer-events-none"></div>
@@ -795,22 +795,24 @@ export default function App() {
               {/* ESTANTE DE CRISTAL ILUMINADO */}
               <div className="absolute bottom-4 w-4/5 h-2 bg-gradient-to-r from-transparent via-pink-400/40 to-transparent rounded-full blur-[1px]"></div>
 
-              {/* PUERTA IZQUIERDA DE CRISTAL TEMPLADO */}
+              {/* PUERTA IZQUIERDA DE CRISTAL TEMPLADO (ABRE HACIA FUERA EN 3D) */}
               <div 
-                className={`absolute top-0 left-0 w-1/2 h-full bg-pink-500/10 border-r border-white/30 backdrop-blur-[2px] transition-transform duration-1000 ease-in-out origin-left flex items-center justify-end pr-2 pointer-events-none z-20 ${
-                  doorsOpened ? '-rotate-y-110 -translate-x-full' : 'rotate-y-0'
-                }`}
-                style={{ transformStyle: 'preserve-3d' }}
+                className="absolute top-0 left-0 w-1/2 h-full bg-pink-500/10 border-r border-white/30 backdrop-blur-[2px] transition-transform duration-1000 ease-in-out origin-left flex items-center justify-end pr-2 pointer-events-none z-20"
+                style={{ 
+                  transform: doorsOpened ? 'rotateY(-110deg)' : 'rotateY(0deg)',
+                  transformStyle: 'preserve-3d'
+                }}
               >
                 <div className="w-1.5 h-12 bg-white/40 rounded-full shadow-md"></div>
               </div>
 
-              {/* PUERTA DERECHA DE CRISTAL TEMPLADO */}
+              {/* PUERTA DERECHA DE CRISTAL TEMPLADO (ABRE HACIA FUERA EN 3D) */}
               <div 
-                className={`absolute top-0 right-0 w-1/2 h-full bg-pink-500/10 border-l border-white/30 backdrop-blur-[2px] transition-transform duration-1000 ease-in-out origin-right flex items-center justify-start pl-2 pointer-events-none z-20 ${
-                  doorsOpened ? 'rotate-y-110 translate-x-full' : 'rotate-y-0'
-                }`}
-                style={{ transformStyle: 'preserve-3d' }}
+                className="absolute top-0 right-0 w-1/2 h-full bg-pink-500/10 border-l border-white/30 backdrop-blur-[2px] transition-transform duration-1000 ease-in-out origin-right flex items-center justify-start pl-2 pointer-events-none z-20"
+                style={{ 
+                  transform: doorsOpened ? 'rotateY(110deg)' : 'rotateY(0deg)',
+                  transformStyle: 'preserve-3d'
+                }}
               >
                 <div className="w-1.5 h-12 bg-white/40 rounded-full shadow-md"></div>
               </div>
