@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// 1. Configuración de Supabase
+// Configuración de Supabase
 const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -10,17 +10,17 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
 
-// Silueta vectorial elegante por defecto
+// Silueta vectorial elegante
 const BarbieSilhouetteFallback = () => (
-  <div className="w-full h-full bg-gradient-to-b from-gray-900 to-pink-950 flex flex-col items-center justify-center p-4 rounded-lg border border-pink-900/30">
-    <svg className="w-20 h-20 text-pink-500/40 mb-2" viewBox="0 0 24 24" fill="currentColor">
+  <div className="w-full h-full bg-gradient-to-b from-gray-900 to-pink-950 flex flex-col items-center justify-center p-2 rounded-lg border border-pink-900/30">
+    <svg className="w-12 h-12 text-pink-500/40 mb-1" viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
     </svg>
-    <span className="text-[10px] text-pink-400 font-bold uppercase tracking-widest text-center">Sin imagen cargada</span>
+    <span className="text-[9px] text-pink-400 font-bold uppercase tracking-wider text-center">Sin imagen</span>
   </div>
 );
 
-// Procesador de imagen: Fondo blanco e iluminación estilo estudio
+// Procesador de fondo blanco estilo estudio
 const processWhiteStudioBackground = (base64Img) => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -67,14 +67,15 @@ function calculateDynamicPrice(item) {
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('catalog');
+  const [activeTab, setActiveTab] = useState('vitrina'); // Pestaña principal al abrir
 
   // Datos
   const [masterCatalog, setMasterCatalog] = useState([]);
   const [myCollection, setMyCollection] = useState([]);
   const [wishlist, setWishlist] = useState([]);
 
-  // Estado de Vitrina Pública
+  // Estados de interfaz móvil
+  const [showMobileMetrics, setShowMobileMetrics] = useState(false);
   const [isVitrinaPublic, setIsVitrinaPublic] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -192,14 +193,12 @@ export default function App() {
     }
   }
 
-  // Métricas financieras
   const totalCollectionValueEUR = myCollection.reduce((acc, item) => {
     const qty = item.quantity || 1;
     const price = item.estimated_min_price || 0;
     return acc + (price * qty);
   }, 0);
 
-  // Alternar Lista de Deseos
   const toggleWishlist = (barbie) => {
     setWishlist(prev => {
       const exists = prev.some(item => item.id === barbie.id);
@@ -208,7 +207,6 @@ export default function App() {
     });
   };
 
-  // Guardar Lore Admin
   const handleOpenEditLore = (barbie) => {
     setEditingLoreItem(barbie);
     setAdminLoreForm({
@@ -264,7 +262,6 @@ export default function App() {
     setEditingLoreItem(null);
   };
 
-  // Guardar en Mi Vitrina
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie) return;
@@ -316,7 +313,6 @@ export default function App() {
     setActiveTab('vitrina');
   };
 
-  // Escáner Gemini 3.6-flash
   const handleScanImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -378,7 +374,6 @@ export default function App() {
     }
   };
 
-  // Enlaces directos a marketplaces
   const getMarketSearchUrls = (barbieName) => {
     const query = encodeURIComponent(`Barbie ${barbieName}`);
     return {
@@ -390,7 +385,6 @@ export default function App() {
     };
   };
 
-  // Enlace y texto para compartir en redes sociales
   const getPublicVitrinaUrl = () => {
     const userId = session?.user?.id || 'demo';
     return `${window.location.origin}/?vitrina=${userId}`;
@@ -409,7 +403,6 @@ export default function App() {
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  // Filtrado
   const filteredMasterCatalog = masterCatalog.filter((barbie) => {
     const nameMatch = (barbie.name || '').toLowerCase().includes(catalogSearchTerm.toLowerCase());
     const lineMatch = (barbie.collection_line || '').toLowerCase().includes(catalogSearchTerm.toLowerCase());
@@ -426,263 +419,166 @@ export default function App() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 font-sans pb-12">
-      {/* HEADER PRINCIPAL */}
-      <header className="bg-gray-900 border-b border-pink-900/40 p-4 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-pink-600 text-white font-black rounded-full w-10 h-10 flex items-center justify-center text-xl shadow-lg shadow-pink-600/30">
+    <div className="min-h-screen bg-gray-950 text-gray-100 font-sans pb-24 pt-2">
+      
+      {/* CABECERA COMPACTA MÓVIL */}
+      <header className="bg-gray-900/90 border-b border-pink-900/40 px-3 py-2 sticky top-0 z-40 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <div className="bg-pink-600 text-white font-black rounded-full w-8 h-8 flex items-center justify-center text-base shadow-md shadow-pink-600/30">
               V
             </div>
             <div>
-              <h1 className="text-xl font-black text-pink-500 tracking-wide">
-                LA VITRINA <span className="text-white text-xs font-normal">DEL COLECCIONISTA DE BARBIE</span>
-              </h1>
-              <p className="text-xs text-gray-400">BARBIE COLLECTION & APP • CATÁLOGO Y GESTIÓN DE ACTIVOS</p>
+              <h1 className="text-sm font-black text-pink-500 tracking-wide leading-none">LA VITRINA</h1>
+              <p className="text-[9px] text-gray-400 leading-none mt-0.5">COLLECTIONS & APP</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* BOTÓN COMPARTIR VITRINA */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowMobileMetrics(!showMobileMetrics)}
+              className="bg-gray-800 border border-gray-700 text-pink-400 text-xs px-2.5 py-1 rounded-lg font-bold flex items-center gap-1"
+            >
+              📊 {currency === 'EUR' ? `${totalCollectionValueEUR}€` : `${Math.round(totalCollectionValueEUR * exchangeRateUSD)}$`}
+            </button>
             <button
               onClick={() => setShowShareModal(true)}
-              className="bg-pink-950 border border-pink-600/60 text-pink-300 hover:bg-pink-900 px-3 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-pink-950/50"
+              className="bg-pink-950 border border-pink-600/50 text-pink-300 text-xs p-1.5 rounded-lg"
+              title="Compartir Vitrina"
             >
-              🌐 {isVitrinaPublic ? 'Vitrina Pública' : 'Hacer Pública'}
-            </button>
-
-            <button 
-              onClick={() => setCurrency(currency === 'EUR' ? 'USD' : 'EUR')}
-              className="bg-gray-800 border border-gray-700 px-3 py-1.5 rounded-full text-xs font-bold text-pink-400 hover:bg-gray-700 transition"
-            >
-              🌐 {currency === 'EUR' ? 'ES | € EUR' : 'US | $ USD'}
+              🌐
             </button>
           </div>
         </div>
+
+        {/* MÉTRICAS COMPACTAS DESPLEGABLES */}
+        {showMobileMetrics && (
+          <div className="mt-2 pt-2 border-t border-gray-800 grid grid-cols-3 gap-2 text-center text-xs animate-fadeIn">
+            <div className="bg-gray-950 p-2 rounded-lg border border-gray-800">
+              <p className="text-[9px] text-gray-400 uppercase font-bold">Valor Total</p>
+              <p className="font-extrabold text-pink-400 mt-0.5">
+                {currency === 'EUR' ? `${totalCollectionValueEUR.toLocaleString()} €` : `${Math.round(totalCollectionValueEUR * exchangeRateUSD).toLocaleString()} $`}
+              </p>
+            </div>
+            <div className="bg-gray-950 p-2 rounded-lg border border-gray-800">
+              <p className="text-[9px] text-gray-400 uppercase font-bold">En Vitrina</p>
+              <p className="font-extrabold text-white mt-0.5">{myCollection.length} uds.</p>
+            </div>
+            <div className="bg-gray-950 p-2 rounded-lg border border-gray-800">
+              <p className="text-[9px] text-gray-400 uppercase font-bold">Wishlist</p>
+              <p className="font-extrabold text-pink-300 mt-0.5">{wishlist.length} pcs.</p>
+            </div>
+          </div>
+        )}
       </header>
 
-      {/* MÉTRICAS FINANCIERAS */}
-      <section className="bg-gradient-to-r from-gray-900 via-pink-950/40 to-gray-900 border-b border-pink-900/30 py-3">
-        <div className="max-w-7xl mx-auto px-4 flex flex-wrap justify-around items-center gap-4 text-center">
-          <div>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Valor Estimado de Colección</p>
-            <p className="text-xl font-black text-pink-400">
-              {currency === 'EUR' 
-                ? `${totalCollectionValueEUR.toLocaleString()} €` 
-                : `${Math.round(totalCollectionValueEUR * exchangeRateUSD).toLocaleString()} $`}
-            </p>
-          </div>
-          <div className="hidden sm:block border-r border-gray-800 h-8"></div>
-          <div>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Piezas en Mi Vitrina</p>
-            <p className="text-xl font-black text-white">{myCollection.length} uds.</p>
-          </div>
-          <div className="hidden sm:block border-r border-gray-800 h-8"></div>
-          <div>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Wishlist (Lista de Deseos)</p>
-            <p className="text-xl font-black text-pink-300">{wishlist.length} piezas</p>
-          </div>
-        </div>
-      </section>
+      {/* CONTENIDO PRINCIPAL SEGÚN PESTAÑA SELECCIONADA */}
+      <main className="max-w-7xl mx-auto px-3 mt-3">
 
-      {/* NAVEGACIÓN */}
-      <nav className="bg-gray-900/80 border-b border-gray-800 py-3 sticky top-[73px] z-30 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto flex justify-center gap-2 px-4 overflow-x-auto">
-          <button 
-            onClick={() => setActiveTab('vitrina')}
-            className={`px-4 py-2 rounded-xl font-bold text-sm transition ${activeTab === 'vitrina' ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/30' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
-          >
-            Mi Vitrina ({myCollection.length})
-          </button>
-          <button 
-            onClick={() => setActiveTab('scan')}
-            className={`px-4 py-2 rounded-xl font-bold text-sm transition ${activeTab === 'scan' ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/30' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
-          >
-            📷 Captura de Barbie
-          </button>
-          <button 
-            onClick={() => setActiveTab('catalog')}
-            className={`px-4 py-2 rounded-xl font-bold text-sm transition ${activeTab === 'catalog' ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/30' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
-          >
-            Catálogo ({masterCatalog.length})
-          </button>
-          <button 
-            onClick={() => setActiveTab('sales')}
-            className={`px-4 py-2 rounded-xl font-bold text-sm transition ${activeTab === 'sales' ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/30' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
-          >
-            🏷️ Ventas / Marketplace
-          </button>
-          <button 
-            onClick={() => setActiveTab('community')}
-            className={`px-4 py-2 rounded-xl font-bold text-sm transition ${activeTab === 'community' ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/30' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
-          >
-            👥 Coleccionistas ({betaTesters.length})
-          </button>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto px-4 mt-6">
-
-        {/* TAB: CATÁLOGO MAESTRO CON BOTÓN DE WISHLIST Y BUSCADOR MULTISITIO */}
-        {activeTab === 'catalog' && (
+        {/* TAB: MI VITRINA */}
+        {activeTab === 'vitrina' && (
           <section>
-            <div className="bg-gray-900 p-4 rounded-xl mb-6 border border-pink-900/40 flex flex-col md:flex-row gap-4 justify-between items-center shadow-lg">
-              <div className="w-full md:w-1/2">
-                <input
-                  type="text"
-                  placeholder="🔍 Buscar por nombre o línea de colección..."
-                  value={catalogSearchTerm}
-                  onChange={(e) => setCatalogSearchTerm(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-pink-500"
-                />
-              </div>
-
-              <div className="w-full md:w-1/2 flex items-center justify-end gap-2">
-                <label className="text-xs font-bold text-pink-400 whitespace-nowrap">Época:</label>
-                <select
-                  value={selectedEraFilter}
-                  onChange={(e) => setSelectedEraFilter(e.target.value)}
-                  className="w-full md:w-auto bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500"
-                >
-                  <option value="Todas">Todas las Épocas</option>
-                  <option value="Vintage (1959-1989)">Vintage (1959 - 1989)</option>
-                  <option value="Modern / Y2K (1990-2009)">Modern / Y2K (1990 - 2009)</option>
-                  <option value="Contemporánea (2010-Presente)">Contemporánea (2010 - Presente)</option>
-                </select>
-              </div>
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-base font-bold text-white">Mi Colección ({myCollection.length})</h2>
+              <button 
+                onClick={() => setCurrency(currency === 'EUR' ? 'USD' : 'EUR')}
+                className="text-[10px] bg-gray-900 border border-gray-700 text-pink-400 px-2 py-1 rounded-md font-bold"
+              >
+                {currency === 'EUR' ? 'Moneda: €' : 'Moneda: $'}
+              </button>
             </div>
 
-            {loading ? (
-              <div className="text-center py-12 text-pink-400 font-bold animate-pulse">Cargando catálogo desde Supabase...</div>
+            {myCollection.length === 0 ? (
+              <div className="text-center py-10 bg-gray-900 rounded-xl border border-gray-800 text-gray-400 text-xs px-4">
+                Aún no tienes muñecas en tu Vitrina. Usa el catálogo o el escáner para añadir la primera.
+              </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {filteredMasterCatalog.map((barbie) => {
-                  const isWishlisted = wishlist.some(item => item.id === barbie.id);
-                  return (
-                    <div key={barbie.id} className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden hover:border-pink-500/50 transition flex flex-col justify-between">
-                      <div>
-                        <div className="h-64 bg-gray-950 p-4 flex items-center justify-center relative">
-                          {barbie.image_url ? (
-                            <img src={barbie.image_url} alt={barbie.name} className="max-h-full object-contain rounded-lg" />
-                          ) : (
-                            <BarbieSilhouetteFallback />
-                          )}
-                          <span className="absolute top-3 right-3 bg-pink-950/80 border border-pink-500/40 text-pink-300 text-xs px-2 py-1 rounded-md font-bold">
-                            {barbie.release_year}
-                          </span>
-                          
-                          {/* BOTÓN FLOTANTE WISHLIST */}
-                          <button 
-                            onClick={() => toggleWishlist(barbie)}
-                            className={`absolute top-3 left-3 p-2 rounded-full border transition ${isWishlisted ? 'bg-pink-600 border-pink-400 text-white' : 'bg-gray-900/80 border-gray-700 text-gray-400 hover:text-pink-400'}`}
-                            title={isWishlisted ? "En tu Lista de Deseos" : "Añadir a Wishlist"}
-                          >
-                            {isWishlisted ? '💖' : '🤍'}
-                          </button>
-                        </div>
-                        <div className="p-4">
-                          <p className="text-xs text-pink-400 font-bold uppercase tracking-wider">{barbie.collection_line}</p>
-                          <h3 className="font-bold text-lg text-white mt-1 leading-snug">{barbie.name}</h3>
-                          <p className="text-xs text-gray-400 mt-2 line-clamp-3">{barbie.lore}</p>
-                        </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {myCollection.map((item) => (
+                  <div key={item.userInstanceId} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between">
+                    <div>
+                      <div className="h-40 bg-gray-950 p-2 flex items-center justify-center relative">
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.name} className="max-h-full object-contain rounded-md" />
+                        ) : (
+                          <BarbieSilhouetteFallback />
+                        )}
+                        <span className="absolute top-1.5 left-1.5 bg-gray-900/90 text-gray-300 text-[8px] px-1.5 py-0.5 rounded font-bold">
+                          {item.condition ? item.condition.split(' ')[0] : 'NFRB'}
+                        </span>
                       </div>
-
-                      <div className="p-4 border-t border-gray-800/80 bg-gray-900/50 flex flex-col gap-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-[10px] text-gray-500 uppercase font-bold">Valor Estimado</p>
-                            <p className="text-pink-400 font-extrabold text-base">
-                              {currency === 'EUR' ? `${barbie.estimated_min_price} €` : `${Math.round(barbie.estimated_min_price * exchangeRateUSD)} $`}
-                            </p>
-                          </div>
-                          
-                          <div className="flex gap-1 items-center flex-wrap justify-end">
-                            <button 
-                              onClick={() => toggleWishlist(barbie)}
-                              className={`text-xs px-2 py-1.5 rounded-lg font-bold border transition ${
-                                isWishlisted 
-                                  ? 'bg-pink-600 border-pink-500 text-white' 
-                                  : 'bg-gray-800 border-gray-700 text-pink-400 hover:bg-gray-700'
-                              }`}
-                              title={isWishlisted ? "Quitar de Deseos" : "Añadir a Deseos"}
-                            >
-                              {isWishlisted ? '💖 En Wishlist' : '🤍 Wishlist'}
-                            </button>
-                            <button 
-                              onClick={() => setComparePriceItem(barbie)}
-                              className="bg-gray-800 hover:bg-gray-700 text-xs px-2 py-1.5 rounded-lg text-pink-300 font-bold transition"
-                              title="Comparar Precios"
-                            >
-                              🔍 Precios
-                            </button>
-                            <button 
-                              onClick={() => handleOpenEditLore(barbie)}
-                              className="bg-gray-800 hover:bg-gray-700 text-xs p-2 rounded-lg text-gray-300 font-bold transition"
-                              title="Editar Historia"
-                            >
-                              ✏️
-                            </button>
-                            <button 
-                              onClick={() => setActiveModal({ type: 'add_to_vitrina', barbie })}
-                              className="bg-pink-600 hover:bg-pink-500 text-white text-xs px-3 py-2 rounded-lg font-bold transition"
-                            >
-                              + Añadir
-                            </button>
-                          </div>
-                        </div>
+                      <div className="p-2.5">
+                        <p className="text-[9px] text-pink-400 font-bold uppercase truncate">{item.collection_line}</p>
+                        <h3 className="font-bold text-xs text-white leading-tight line-clamp-1">{item.name}</h3>
                       </div>
                     </div>
-                  );
-                })}
+                    <div className="p-2 border-t border-gray-800 bg-gray-950 flex items-center justify-between">
+                      <span className="text-pink-400 font-extrabold text-xs">{item.estimated_min_price} €</span>
+                      <div className="flex gap-1">
+                        <button 
+                          onClick={() => setCertificateItem(item)}
+                          className="bg-pink-950 text-pink-300 text-[10px] p-1 rounded font-bold"
+                          title="Certificado"
+                        >
+                          📜
+                        </button>
+                        <button 
+                          onClick={() => handleOpenEditLore(item)}
+                          className="bg-gray-800 text-gray-300 text-[10px] p-1 rounded font-bold"
+                          title="Editar"
+                        >
+                          ✏️
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </section>
         )}
 
-        {/* TAB: ESCÁNER */}
+        {/* TAB: ESCÁNER CON CÁMARA */}
         {activeTab === 'scan' && (
-          <section className="max-w-2xl mx-auto bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-2xl">
-            <h2 className="text-xl font-extrabold text-pink-500 text-center mb-2">Escáner de Catalogación IA</h2>
-            <p className="text-xs text-gray-400 text-center mb-6">Fotografía la Barbie para identificarla con Gemini 3.6-flash y guardarla en tu colección con fondo e iluminación de estudio.</p>
+          <section className="max-w-md mx-auto bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl">
+            <h2 className="text-base font-extrabold text-pink-500 text-center mb-1">Escáner de Catalogación IA</h2>
+            <p className="text-[11px] text-gray-400 text-center mb-4">Fotografía la Barbie para identificarla y guardarla con acabado de estudio.</p>
 
-            <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-700 rounded-xl p-6 bg-gray-950">
-              <label className="bg-pink-600 hover:bg-pink-500 text-white font-bold px-6 py-3 rounded-xl cursor-pointer transition shadow-lg shadow-pink-600/30">
-                📷 Tomar Foto / Abrir Cámara
+            <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-700 rounded-xl p-4 bg-gray-950">
+              <label className="bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer transition shadow-lg shadow-pink-600/30">
+                📷 Abrir Cámara / Foto
                 <input type="file" accept="image/*" capture="environment" onChange={handleScanImage} className="hidden" />
               </label>
 
               {scannedImageBase64 && (
-                <div className="mt-4 text-center">
-                  <p className="text-xs text-gray-400 mb-2">PREVISUALIZACIÓN:</p>
-                  <img src={scannedImageBase64} alt="Captura" className="max-h-64 rounded-lg border border-gray-800 mx-auto" />
+                <div className="mt-3 text-center">
+                  <img src={scannedImageBase64} alt="Captura" className="max-h-48 rounded-lg border border-gray-800 mx-auto" />
                 </div>
               )}
             </div>
 
             {scanning && (
-              <div className="mt-6 p-4 bg-gray-950 rounded-xl border border-pink-900/50 text-center text-pink-400 font-bold text-sm animate-pulse">
+              <div className="mt-4 p-3 bg-gray-950 rounded-lg border border-pink-900/50 text-center text-pink-400 font-bold text-xs animate-pulse">
                 Identificando modelo con Gemini 3.6-flash...
               </div>
             )}
 
             {debugError && (
-              <div className="mt-6 p-4 bg-red-950/60 border border-red-800 text-red-300 rounded-xl text-xs font-mono">
-                <strong>⚠️ DIAGNÓSTICO:</strong>
-                <p className="mt-1">{debugError}</p>
+              <div className="mt-4 p-3 bg-red-950/60 border border-red-800 text-red-300 rounded-lg text-[10px] font-mono">
+                {debugError}
               </div>
             )}
 
             {scanResult && scanResult.primary_match && (
-              <div className="mt-6 bg-gray-950 border border-pink-600/40 rounded-xl p-5">
-                <span className="bg-pink-600 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">Resultado Detectado</span>
-                <h3 className="text-xl font-black text-white mt-2">{scanResult.primary_match.name}</h3>
-                <p className="text-xs text-pink-400 font-bold">{scanResult.primary_match.collection_line} ({scanResult.primary_match.release_year})</p>
-                <p className="text-xs text-gray-300 mt-3">{scanResult.primary_match.lore}</p>
+              <div className="mt-4 bg-gray-950 border border-pink-600/40 rounded-xl p-4">
+                <span className="bg-pink-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase">Identificada</span>
+                <h3 className="text-sm font-black text-white mt-1">{scanResult.primary_match.name}</h3>
+                <p className="text-[10px] text-pink-400 font-bold">{scanResult.primary_match.collection_line} ({scanResult.primary_match.release_year})</p>
 
-                <div className="mt-4 pt-4 border-t border-gray-800 flex justify-between items-center">
+                <div className="mt-3 pt-3 border-t border-gray-800 flex justify-between items-center">
                   <div>
-                    <p className="text-[10px] text-gray-500 font-bold uppercase">Valor Estimado de Mercado</p>
-                    <p className="text-lg font-bold text-pink-400">{scanResult.primary_match.estimated_min_price} €</p>
+                    <p className="text-[8px] text-gray-500 uppercase font-bold">Estimación</p>
+                    <p className="text-sm font-bold text-pink-400">{scanResult.primary_match.estimated_min_price} €</p>
                   </div>
                   <button 
                     onClick={() => setActiveModal({ 
@@ -696,9 +592,9 @@ export default function App() {
                         image_url: scannedImageBase64
                       }
                     })}
-                    className="bg-pink-600 hover:bg-pink-500 text-white text-xs px-4 py-2 rounded-lg font-bold transition shadow-lg shadow-pink-600/40"
+                    className="bg-pink-600 hover:bg-pink-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow-md"
                   >
-                    ✨ Guardar en Mi Vitrina
+                    ✨ Guardar
                   </button>
                 </div>
               </div>
@@ -706,107 +602,116 @@ export default function App() {
           </section>
         )}
 
-        {/* TAB: MI VITRINA */}
-        {activeTab === 'vitrina' && (
+        {/* TAB: CATÁLOGO MAESTRO */}
+        {activeTab === 'catalog' && (
           <section>
-            {/* BANNER DE VITRINA PÚBLICA */}
-            <div className="bg-gradient-to-r from-gray-900 via-pink-950/60 to-gray-900 border border-pink-900/50 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-xl">
-              <div>
-                <h3 className="text-sm font-black text-white flex items-center gap-2">
-                  <span>{isVitrinaPublic ? '🌐 Tu Vitrina es PÚBLICA' : '🔒 Tu Vitrina es PRIVADA'}</span>
-                </h3>
-                <p className="text-xs text-gray-400 mt-1">
-                  {isVitrinaPublic 
-                    ? 'Cualquier coleccionista con tu enlace puede explorar tu vitrina e inspeccionar tus piezas.' 
-                    : 'Activa la opción pública para compartir tu colección en redes sociales como Instagram, TikTok o WhatsApp.'}
-                </p>
+            {/* BUSCADOR MÓVIL Y FILTROS */}
+            <div className="bg-gray-900 p-2.5 rounded-xl mb-3 border border-pink-900/40 flex flex-col gap-2">
+              <input
+                type="text"
+                placeholder="🔍 Buscar Barbie o línea..."
+                value={catalogSearchTerm}
+                onChange={(e) => setCatalogSearchTerm(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-pink-500"
+              />
+
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-[10px] font-bold text-pink-400 uppercase">Época:</span>
+                <select
+                  value={selectedEraFilter}
+                  onChange={(e) => setSelectedEraFilter(e.target.value)}
+                  className="bg-gray-800 border border-gray-700 text-white rounded-md px-2 py-1 text-[11px]"
+                >
+                  <option value="Todas">Todas las Épocas</option>
+                  <option value="Vintage (1959-1989)">Vintage (1959-89)</option>
+                  <option value="Modern / Y2K (1990-2009)">Modern/Y2K (1990-09)</option>
+                  <option value="Contemporánea (2010-Presente)">Contemporánea (2010+)</option>
+                </select>
               </div>
-              <button
-                onClick={() => setShowShareModal(true)}
-                className="bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition shadow-lg shadow-pink-600/30 whitespace-nowrap"
-              >
-                📲 Compartir en Redes
-              </button>
             </div>
 
-            <h2 className="text-xl font-bold text-white mb-4">Mi Colección Personal ({myCollection.length})</h2>
-            {myCollection.length === 0 ? (
-              <div className="text-center py-12 bg-gray-900 rounded-2xl border border-gray-800 text-gray-400">
-                Aún no tienes muñecas registradas en tu Vitrina. Añádelas desde el Catálogo o usa el Escáner.
-              </div>
+            {loading ? (
+              <div className="text-center py-8 text-pink-400 font-bold text-xs animate-pulse">Cargando catálogo...</div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {myCollection.map((item) => (
-                  <div key={item.userInstanceId} className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden flex flex-col justify-between">
-                    <div>
-                      <div className="h-64 bg-gray-950 p-4 flex items-center justify-center relative">
-                        {item.image_url ? (
-                          <img src={item.image_url} alt={item.name} className="max-h-full object-contain rounded-lg" />
-                        ) : (
-                          <BarbieSilhouetteFallback />
-                        )}
-                        <span className="absolute top-3 left-3 bg-gray-800 text-gray-300 text-[10px] px-2 py-1 rounded font-bold">
-                          {item.condition}
-                        </span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {filteredMasterCatalog.map((barbie) => {
+                  const isWishlisted = wishlist.some(item => item.id === barbie.id);
+                  return (
+                    <div key={barbie.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between">
+                      <div>
+                        <div className="h-40 bg-gray-950 p-2 flex items-center justify-center relative">
+                          {barbie.image_url ? (
+                            <img src={barbie.image_url} alt={barbie.name} className="max-h-full object-contain rounded-md" />
+                          ) : (
+                            <BarbieSilhouetteFallback />
+                          )}
+                          <span className="absolute top-1.5 right-1.5 bg-pink-950/90 text-pink-300 text-[8px] px-1.5 py-0.5 rounded font-bold">
+                            {barbie.release_year}
+                          </span>
+                          <button 
+                            onClick={() => toggleWishlist(barbie)}
+                            className={`absolute top-1.5 left-1.5 p-1 rounded-full text-xs transition ${isWishlisted ? 'bg-pink-600 text-white' : 'bg-gray-900/80 text-gray-400'}`}
+                          >
+                            {isWishlisted ? '💖' : '🤍'}
+                          </button>
+                        </div>
+                        <div className="p-2">
+                          <p className="text-[9px] text-pink-400 font-bold uppercase truncate">{barbie.collection_line}</p>
+                          <h3 className="font-bold text-xs text-white leading-tight line-clamp-1">{barbie.name}</h3>
+                        </div>
                       </div>
-                      <div className="p-4">
-                        <p className="text-xs text-pink-400 font-bold uppercase">{item.collection_line}</p>
-                        <h3 className="font-bold text-lg text-white mt-1">{item.name}</h3>
-                        <p className="text-xs text-gray-400 mt-2 line-clamp-3">{item.lore}</p>
-                      </div>
-                    </div>
-                    <div className="p-4 border-t border-gray-800 bg-gray-900/50 flex flex-col gap-2">
-                      <div className="flex justify-between items-center">
-                        <p className="text-pink-400 font-bold">{item.estimated_min_price} €</p>
+
+                      <div className="p-2 border-t border-gray-800/80 bg-gray-950 flex flex-col gap-1.5">
+                        <div className="flex justify-between items-center">
+                          <span className="text-pink-400 font-extrabold text-xs">{barbie.estimated_min_price} €</span>
+                          <button 
+                            onClick={() => setComparePriceItem(barbie)}
+                            className="bg-gray-800 text-[10px] px-1.5 py-0.5 rounded text-pink-300 font-bold"
+                          >
+                            🔍 Precios
+                          </button>
+                        </div>
                         <div className="flex gap-1">
                           <button 
-                            onClick={() => setCertificateItem(item)}
-                            className="bg-pink-950 border border-pink-700 text-pink-300 text-xs px-2 py-1 rounded hover:bg-pink-900 font-bold"
-                            title="Ver Certificado de Autenticidad"
-                          >
-                            📜 Certificado
-                          </button>
-                          <button 
-                            onClick={() => handleOpenEditLore(item)}
-                            className="bg-gray-800 text-xs px-2 py-1 rounded text-gray-300 font-bold hover:bg-gray-700"
+                            onClick={() => handleOpenEditLore(barbie)}
+                            className="bg-gray-800 text-gray-300 text-[10px] p-1 rounded font-bold w-1/3 flex justify-center"
                           >
                             ✏️
+                          </button>
+                          <button 
+                            onClick={() => setActiveModal({ type: 'add_to_vitrina', barbie })}
+                            className="bg-pink-600 text-white text-[10px] font-bold py-1 rounded w-2/3"
+                          >
+                            + Añadir
                           </button>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
         )}
 
-        {/* TAB: MARKETPLACE */}
+        {/* TAB: MARKETPLACE / VENTAS */}
         {activeTab === 'sales' && (
-          <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-            <h2 className="text-xl font-bold text-pink-500 mb-2">Generador de Anuncios y Gestión de Ventas</h2>
-            <p className="text-xs text-gray-400 mb-6">Genera anuncios optimizados para Vinted, Wallapop, eBay y Catawiki.</p>
+          <section className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <h2 className="text-base font-bold text-pink-500 mb-1">Anuncios de Venta</h2>
+            <p className="text-[11px] text-gray-400 mb-4">Copia textos optimizados para Vinted, Wallapop y eBay.</p>
 
             {myCollection.length === 0 ? (
-              <p className="text-sm text-gray-500 italic">Registra muñecas en tu Vitrina para activar las publicaciones en marketplaces.</p>
+              <p className="text-xs text-gray-500 italic">No tienes muñecas en tu Vitrina para vender.</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
                 {myCollection.map((item) => (
-                  <div key={item.userInstanceId} className="bg-gray-950 p-4 rounded-xl border border-gray-800">
-                    <h3 className="font-bold text-white text-base">{item.name}</h3>
-                    <p className="text-xs text-pink-400 font-semibold">{item.collection_line} ({item.release_year})</p>
-                    <p className="text-xs text-gray-400 mt-2"><strong>Estado:</strong> {item.condition}</p>
-                    <p className="text-xs text-gray-400"><strong>Precio sugerido:</strong> {item.estimated_min_price} €</p>
-
-                    <div className="mt-4 p-3 bg-gray-900 rounded border border-gray-800 text-xs font-mono text-gray-300">
-                      <p><strong>[Título Vinted/Wallapop]:</strong> Barbie {item.name} {item.release_year} {item.condition}</p>
-                      <p className="mt-2"><strong>[Descripción]:</strong> En venta Barbie oficial de Mattel ({item.release_year}). Estado: {item.condition}. {item.lore}</p>
-                    </div>
+                  <div key={item.userInstanceId} className="bg-gray-950 p-3 rounded-lg border border-gray-800 text-xs">
+                    <h3 className="font-bold text-white">{item.name}</h3>
+                    <p className="text-[10px] text-pink-400">{item.collection_line} ({item.release_year})</p>
 
                     <button 
                       onClick={() => navigator.clipboard.writeText(`Barbie ${item.name} (${item.release_year}) - Estado: ${item.condition}. ${item.lore}`)}
-                      className="mt-3 w-full bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold py-2 rounded-lg transition"
+                      className="mt-2 w-full bg-pink-600 hover:bg-pink-500 text-white text-[11px] font-bold py-1.5 rounded transition"
                     >
                       📋 Copiar Texto de Anuncio
                     </button>
@@ -819,21 +724,20 @@ export default function App() {
 
         {/* TAB: COMUNIDAD */}
         {activeTab === 'community' && (
-          <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-            <h2 className="text-xl font-bold text-pink-500 mb-2">Comunidad & Perfiles de Probadores Beta</h2>
-            <p className="text-xs text-gray-400 mb-6">Red de coleccionistas verificados y colaboradores de catalogación.</p>
+          <section className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <h2 className="text-base font-bold text-pink-500 mb-1">Coleccionistas Beta</h2>
+            <p className="text-[11px] text-gray-400 mb-4">Perfiles de curadores y colaboradores.</p>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-3">
               {betaTesters.map((tester) => (
-                <div key={tester.id} className="bg-gray-950 p-5 rounded-xl border border-gray-800 flex flex-col items-center text-center shadow-lg hover:border-pink-500/40 transition">
-                  <div className="w-16 h-16 bg-pink-950/80 border border-pink-500/40 rounded-full flex items-center justify-center text-3xl mb-3">
+                <div key={tester.id} className="bg-gray-950 p-3 rounded-lg border border-gray-800 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-pink-950/80 border border-pink-500/40 rounded-full flex items-center justify-center text-lg">
                     {tester.avatar}
                   </div>
-                  <h3 className="font-extrabold text-pink-400 text-base">{tester.handle}</h3>
-                  <span className="mt-1 bg-pink-900/50 text-pink-300 text-[10px] font-bold px-2 py-0.5 rounded border border-pink-700/50">
-                    {tester.badge}
-                  </span>
-                  <p className="text-xs text-gray-300 mt-3 font-medium">{tester.role}</p>
+                  <div>
+                    <h3 className="font-extrabold text-pink-400 text-xs">{tester.handle}</h3>
+                    <p className="text-[10px] text-gray-300">{tester.role}</p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -842,106 +746,71 @@ export default function App() {
 
       </main>
 
-      {/* MODAL: HACER PÚBLICA / COMPARTIR EN REDES SOCIALES */}
-      {showShareModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl relative">
-            <button 
-              onClick={() => setShowShareModal(false)}
-              className="absolute top-3 right-3 text-gray-400 hover:text-white font-bold text-sm"
-            >
-              ✕
-            </button>
-            
-            <h3 className="text-lg font-bold text-pink-500 mb-1">Compartir Tu Vitrina</h3>
-            <p className="text-xs text-gray-400 mb-4">Haz visible tu colección y compártela en redes sociales.</p>
-
-            {/* SWITCH HACER PÚBLICA */}
-            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 flex items-center justify-between mb-5">
-              <div>
-                <p className="text-xs font-bold text-white">Estado de la Vitrina</p>
-                <p className="text-[10px] text-gray-400">{isVitrinaPublic ? 'Pública para todos los usuarios' : 'Privada (Solo accesible por ti)'}</p>
-              </div>
-              <button
-                onClick={() => setIsVitrinaPublic(!isVitrinaPublic)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold transition ${
-                  isVitrinaPublic 
-                    ? 'bg-pink-600 text-white' 
-                    : 'bg-gray-800 text-gray-400 border border-gray-700'
-                }`}
-              >
-                {isVitrinaPublic ? 'PÚBLICA' : 'PRIVADA'}
-              </button>
-            </div>
-
-            {/* BOTONES DIRECTOS PARA REDES */}
-            <div className="space-y-2">
-              <a
-                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(getShareText())}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between bg-green-950/40 hover:bg-green-900/60 border border-green-700/50 p-3 rounded-xl transition text-xs font-bold text-green-300"
-              >
-                <span>💬 Compartir en WhatsApp</span>
-                <span>Enviar ➔</span>
-              </a>
-
-              <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(getShareText())}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between bg-sky-950/40 hover:bg-sky-900/60 border border-sky-700/50 p-3 rounded-xl transition text-xs font-bold text-sky-300"
-              >
-                <span>🐦 Publicar en X (Twitter)</span>
-                <span>Postear ➔</span>
-              </a>
-
-              <a
-                href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getPublicVitrinaUrl())}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between bg-blue-950/40 hover:bg-blue-900/60 border border-blue-700/50 p-3 rounded-xl transition text-xs font-bold text-blue-300"
-              >
-                <span>📘 Compartir en Facebook</span>
-                <span>Publicar ➔</span>
-              </a>
-
-              <button
-                onClick={handleCopyShareLink}
-                className="w-full flex items-center justify-between bg-gray-800 hover:bg-gray-700 border border-gray-700 p-3 rounded-xl transition text-xs font-bold text-gray-200 mt-2"
-              >
-                <span>🔗 {copiedLink ? '¡Enlace Copiado al Portapapeles!' : 'Copiar Enlace Directo'}</span>
-                <span>{copiedLink ? '✓' : 'Copiar'}</span>
-              </button>
-            </div>
-          </div>
+      {/* BARRA DE NAVEGACIÓN INFERIOR FIJA (ESTILO APP NATIVA MÓVIL) */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 border-t border-gray-800 z-50 backdrop-blur-lg px-2 py-1.5">
+        <div className="max-w-md mx-auto flex justify-around items-center">
+          <button 
+            onClick={() => setActiveTab('vitrina')}
+            className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition ${activeTab === 'vitrina' ? 'text-pink-500' : 'text-gray-400'}`}
+          >
+            <span className="text-base">💎</span>
+            <span>Vitrina</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('scan')}
+            className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition ${activeTab === 'scan' ? 'text-pink-500' : 'text-gray-400'}`}
+          >
+            <span className="text-base">📷</span>
+            <span>Escáner</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('catalog')}
+            className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition ${activeTab === 'catalog' ? 'text-pink-500' : 'text-gray-400'}`}
+          >
+            <span className="text-base">📖</span>
+            <span>Catálogo</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('sales')}
+            className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition ${activeTab === 'sales' ? 'text-pink-500' : 'text-gray-400'}`}
+          >
+            <span className="text-base">🏷️</span>
+            <span>Ventas</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('community')}
+            className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition ${activeTab === 'community' ? 'text-pink-500' : 'text-gray-400'}`}
+          >
+            <span className="text-base">👥</span>
+            <span>Red</span>
+          </button>
         </div>
-      )}
+      </nav>
 
-      {/* MODAL: BUSCADOR DE PRECIOS MULTISITIO */}
+      {/* MODAL: PRECIOS MULTISITIO */}
       {comparePriceItem && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl relative">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-xs w-full relative">
             <button 
               onClick={() => setComparePriceItem(null)}
-              className="absolute top-3 right-3 text-gray-400 hover:text-white font-bold text-sm"
+              className="absolute top-2 right-2 text-gray-400 hover:text-white font-bold text-xs"
             >
               ✕
             </button>
-            <h3 className="text-lg font-bold text-pink-500 mb-1">Buscar Mejor Precio</h3>
-            <p className="text-xs text-gray-400 mb-4">{comparePriceItem.name} ({comparePriceItem.release_year})</p>
+            <h3 className="text-sm font-bold text-pink-500 mb-1">Precios en Mercado</h3>
+            <p className="text-[11px] text-gray-400 mb-3">{comparePriceItem.name}</p>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5 text-xs">
               {Object.entries(getMarketSearchUrls(comparePriceItem.name)).map(([platform, url]) => (
                 <a
                   key={platform}
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-between bg-gray-950 hover:bg-pink-950/40 border border-gray-800 hover:border-pink-500/50 p-3 rounded-xl transition text-xs font-bold text-white uppercase"
+                  className="flex items-center justify-between bg-gray-950 p-2 rounded border border-gray-800 text-[11px] font-bold text-white uppercase"
                 >
-                  <span>Buscar en {platform}</span>
-                  <span className="text-pink-400">🔗 Abrir</span>
+                  <span>{platform}</span>
+                  <span className="text-pink-400">Buscar ➔</span>
                 </a>
               ))}
             </div>
@@ -949,33 +818,46 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL: CERTIFICADO DE AUTENTICIDAD */}
-      {certificateItem && (
+      {/* MODAL: COMPARTIR EN REDES */}
+      {showShareModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gradient-to-b from-gray-900 to-gray-950 border-2 border-pink-500/50 rounded-2xl p-6 max-w-md w-full shadow-2xl relative">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-xs w-full relative">
             <button 
-              onClick={() => setCertificateItem(null)}
-              className="absolute top-3 right-3 text-gray-400 hover:text-white font-bold text-sm"
+              onClick={() => setShowShareModal(false)}
+              className="absolute top-2 right-2 text-gray-400 hover:text-white font-bold text-xs"
             >
               ✕
             </button>
-            <div className="border border-pink-500/30 p-4 rounded-xl text-center">
-              <div className="text-pink-500 font-black text-xl tracking-widest uppercase">Certificado Oficial</div>
-              <div className="text-xs text-gray-400 tracking-wider">REGISTRO DE LA VITRINA DEL COLECCIONISTA</div>
+            <h3 className="text-sm font-bold text-pink-500 mb-1">Compartir Vitrina</h3>
+            <p className="text-[11px] text-gray-400 mb-3">Publica tu colección en tus redes.</p>
 
-              <div className="my-6">
-                <h3 className="font-extrabold text-lg text-white">{certificateItem.name}</h3>
-                <p className="text-xs text-pink-400 font-bold">{certificateItem.collection_line} ({certificateItem.release_year})</p>
-                <p className="text-xs text-gray-400 mt-2"><strong>Número de Serie:</strong> {certificateItem.serial_number}</p>
-                <p className="text-xs text-gray-400"><strong>Condición:</strong> {certificateItem.condition}</p>
-              </div>
+            <div className="space-y-2 text-xs">
+              <a
+                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(getShareText())}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between bg-green-950/60 border border-green-800 p-2 rounded text-[11px] font-bold text-green-300"
+              >
+                <span>WhatsApp</span>
+                <span>Enviar ➔</span>
+              </a>
 
-              <p className="text-[10px] text-gray-500 italic mb-4">{certificateItem.lore}</p>
+              <a
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(getShareText())}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between bg-sky-950/60 border border-sky-800 p-2 rounded text-[11px] font-bold text-sky-300"
+              >
+                <span>X (Twitter)</span>
+                <span>Postear ➔</span>
+              </a>
 
-              <div className="pt-4 border-t border-gray-800 flex justify-between items-center text-[10px] text-gray-400">
-                <span>Verificado por IA Gemini 3.6</span>
-                <span className="font-bold text-pink-400">STATUS: AUTÉNTICO</span>
-              </div>
+              <button
+                onClick={handleCopyShareLink}
+                className="w-full text-center bg-gray-800 border border-gray-700 p-2 rounded text-[11px] font-bold text-gray-200 mt-1"
+              >
+                {copiedLink ? '¡Enlace Copiado!' : 'Copiar Enlace Directo'}
+              </button>
             </div>
           </div>
         </div>
@@ -984,54 +866,53 @@ export default function App() {
       {/* MODAL: EDITAR HISTORIA ADMIN */}
       {editingLoreItem && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-lg w-full">
-            <h3 className="text-lg font-bold text-pink-500 mb-2">Editar Historia Oficial (Admin)</h3>
-            <p className="text-xs text-gray-400 mb-4">{editingLoreItem.name}</p>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-sm w-full">
+            <h3 className="text-sm font-bold text-pink-500 mb-2">Editar Lore (Admin)</h3>
 
-            <form onSubmit={handleSaveAdminLore} className="space-y-4">
+            <form onSubmit={handleSaveAdminLore} className="space-y-3 text-xs">
               <div>
-                <label className="text-xs font-bold text-gray-300 block mb-1">Línea de Colección:</label>
+                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Línea:</label>
                 <input
                   type="text"
                   value={adminLoreForm.collection_line}
                   onChange={(e) => setAdminLoreForm({ ...adminLoreForm, collection_line: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm"
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-300 block mb-1">Año de Lanzamiento:</label>
+                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Año:</label>
                 <input
                   type="number"
                   value={adminLoreForm.release_year}
                   onChange={(e) => setAdminLoreForm({ ...adminLoreForm, release_year: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm"
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-300 block mb-1">Historia / Lore Permanente:</label>
+                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Lore:</label>
                 <textarea
-                  rows="5"
+                  rows="4"
                   value={adminLoreForm.lore}
                   onChange={(e) => setAdminLoreForm({ ...adminLoreForm, lore: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-pink-500"
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setEditingLoreItem(null)}
-                  className="bg-gray-800 text-gray-300 px-4 py-2 rounded-lg text-sm font-bold"
+                  className="bg-gray-800 text-gray-300 px-3 py-1.5 rounded font-bold"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="bg-pink-600 hover:bg-pink-500 text-white px-4 py-2 rounded-lg text-sm font-bold"
+                  className="bg-pink-600 text-white px-3 py-1.5 rounded font-bold"
                 >
-                  Guardar Permanente
+                  Guardar
                 </button>
               </div>
             </form>
@@ -1039,52 +920,40 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL: CONFIRMAR REGISTRO EN VITRINA */}
+      {/* MODAL: CONFIRMAR REGISTRO */}
       {activeModal?.type === 'add_to_vitrina' && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-bold text-pink-500 mb-1">Añadir a Mi Vitrina</h3>
-            <p className="text-xs text-gray-400 mb-4">{activeModal.barbie.name}</p>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-xs w-full">
+            <h3 className="text-sm font-bold text-pink-500 mb-1">Añadir a Mi Vitrina</h3>
+            <p className="text-[10px] text-gray-400 mb-3">{activeModal.barbie.name}</p>
 
-            <form onSubmit={handleAddToMyVitrina} className="space-y-4">
+            <form onSubmit={handleAddToMyVitrina} className="space-y-3 text-xs">
               <div>
-                <label className="text-xs font-bold text-gray-300 block mb-1">Estado de Conservación:</label>
+                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Estado:</label>
                 <select
                   value={userBarbieForm.condition}
                   onChange={(e) => setUserBarbieForm({ ...userBarbieForm, condition: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm"
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5"
                 >
                   <option value="NFRB (Caja Original Precintada)">NFRB (Caja Precintada)</option>
                   <option value="MIB (En Caja Excelente)">MIB (En Caja Excelente)</option>
                   <option value="Loose (Fuera de Caja con Accesorios)">Loose (Con Accesorios)</option>
-                  <option value="Restaurada / Custom">Restaurada / Custom</option>
                 </select>
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-gray-300 block mb-1">Número de Serie (Opcional):</label>
-                <input
-                  type="text"
-                  placeholder="Ej. MAT-1959-001"
-                  value={userBarbieForm.serialNumber}
-                  onChange={(e) => setUserBarbieForm({ ...userBarbieForm, serialNumber: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setActiveModal(null)}
-                  className="bg-gray-800 text-gray-300 px-4 py-2 rounded-lg text-sm font-bold"
+                  className="bg-gray-800 text-gray-300 px-3 py-1.5 rounded font-bold"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="bg-pink-600 hover:bg-pink-500 text-white px-4 py-2 rounded-lg text-sm font-bold"
+                  className="bg-pink-600 text-white px-3 py-1.5 rounded font-bold"
                 >
-                  Confirmar Registro
+                  Confirmar
                 </button>
               </div>
             </form>
