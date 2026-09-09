@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// 1. Limpieza de URLs para Supabase
+// 1. Configuración de Supabase
 const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -10,7 +10,7 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
 
-// Silueta vectorial elegante por defecto (evita fotos aleatorias)
+// Silueta vectorial elegante por defecto
 const BarbieSilhouetteFallback = () => (
   <div className="w-full h-full bg-gradient-to-b from-gray-900 to-pink-950 flex flex-col items-center justify-center p-4 rounded-lg border border-pink-900/30">
     <svg className="w-20 h-20 text-pink-500/40 mb-2" viewBox="0 0 24 24" fill="currentColor">
@@ -20,7 +20,7 @@ const BarbieSilhouetteFallback = () => (
   </div>
 );
 
-// Procesador de imagen: Limpia fondo y añade base blanca estilo estudio profesional
+// Procesador de imagen: Fondo blanco e iluminación estilo estudio
 const processWhiteStudioBackground = (base64Img) => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -32,11 +32,9 @@ const processWhiteStudioBackground = (base64Img) => {
       canvas.height = img.height || 800;
       const ctx = canvas.getContext('2d');
 
-      // Fondo blanco estricto
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Base / sombra de vitrina
       const gradient = ctx.createRadialGradient(
         canvas.width / 2, canvas.height * 0.85, 10,
         canvas.width / 2, canvas.height * 0.85, canvas.width * 0.4
@@ -48,7 +46,6 @@ const processWhiteStudioBackground = (base64Img) => {
       ctx.ellipse(canvas.width / 2, canvas.height * 0.85, canvas.width * 0.35, canvas.height * 0.05, 0, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Dibujar imagen capturada
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       resolve(canvas.toDataURL('image/jpeg', 0.9));
     };
@@ -76,6 +73,11 @@ export default function App() {
   const [masterCatalog, setMasterCatalog] = useState([]);
   const [myCollection, setMyCollection] = useState([]);
   const [wishlist, setWishlist] = useState([]);
+
+  // Estado de Vitrina Pública
+  const [isVitrinaPublic, setIsVitrinaPublic] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Perfiles Reales de Coleccionistas
   const betaTesters = [
@@ -262,7 +264,7 @@ export default function App() {
     setEditingLoreItem(null);
   };
 
-  // Guardar en Mi Vitrina (Con procesado de fondo blanco)
+  // Guardar en Mi Vitrina
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie) return;
@@ -388,7 +390,26 @@ export default function App() {
     };
   };
 
-  // Filtros de búsqueda
+  // Enlace y texto para compartir en redes sociales
+  const getPublicVitrinaUrl = () => {
+    const userId = session?.user?.id || 'demo';
+    return `${window.location.origin}/?vitrina=${userId}`;
+  };
+
+  const getShareText = () => {
+    return `¡Te invito a ver mi colección oficial de Barbie en La Vitrina del Coleccionista! 🎀\n\n` +
+      `📊 Piezas catalogadas: ${myCollection.length}\n` +
+      `💰 Valor estimado: ${totalCollectionValueEUR.toLocaleString()} €\n\n` +
+      `Descubre mi colección aquí: ${getPublicVitrinaUrl()}`;
+  };
+
+  const handleCopyShareLink = () => {
+    navigator.clipboard.writeText(getPublicVitrinaUrl());
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  // Filtrado
   const filteredMasterCatalog = masterCatalog.filter((barbie) => {
     const nameMatch = (barbie.name || '').toLowerCase().includes(catalogSearchTerm.toLowerCase());
     const lineMatch = (barbie.collection_line || '').toLowerCase().includes(catalogSearchTerm.toLowerCase());
@@ -421,10 +442,18 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {/* BOTÓN COMPARTIR VITRINA */}
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="bg-pink-950 border border-pink-600/60 text-pink-300 hover:bg-pink-900 px-3 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-pink-950/50"
+            >
+              🌐 {isVitrinaPublic ? 'Vitrina Pública' : 'Hacer Pública'}
+            </button>
+
             <button 
               onClick={() => setCurrency(currency === 'EUR' ? 'USD' : 'EUR')}
-              className="bg-gray-800 border border-gray-700 px-3 py-1 rounded-full text-xs font-bold text-pink-400 hover:bg-gray-700 transition"
+              className="bg-gray-800 border border-gray-700 px-3 py-1.5 rounded-full text-xs font-bold text-pink-400 hover:bg-gray-700 transition"
             >
               🌐 {currency === 'EUR' ? 'ES | € EUR' : 'US | $ USD'}
             </button>
@@ -567,7 +596,6 @@ export default function App() {
                             </p>
                           </div>
                           
-                          {/* ACCIONES DE TARJETA CON BOTÓN VISIBLE DE WISHLIST */}
                           <div className="flex gap-1 items-center flex-wrap justify-end">
                             <button 
                               onClick={() => toggleWishlist(barbie)}
@@ -583,7 +611,7 @@ export default function App() {
                             <button 
                               onClick={() => setComparePriceItem(barbie)}
                               className="bg-gray-800 hover:bg-gray-700 text-xs px-2 py-1.5 rounded-lg text-pink-300 font-bold transition"
-                              title="Comparar Precios en Vinted/Wallapop/eBay"
+                              title="Comparar Precios"
                             >
                               🔍 Precios
                             </button>
@@ -611,7 +639,7 @@ export default function App() {
           </section>
         )}
 
-        {/* TAB: ESCÁNER CON GUARDADO DIRECTO EN MI VITRINA */}
+        {/* TAB: ESCÁNER */}
         {activeTab === 'scan' && (
           <section className="max-w-2xl mx-auto bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-2xl">
             <h2 className="text-xl font-extrabold text-pink-500 text-center mb-2">Escáner de Catalogación IA</h2>
@@ -681,6 +709,26 @@ export default function App() {
         {/* TAB: MI VITRINA */}
         {activeTab === 'vitrina' && (
           <section>
+            {/* BANNER DE VITRINA PÚBLICA */}
+            <div className="bg-gradient-to-r from-gray-900 via-pink-950/60 to-gray-900 border border-pink-900/50 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-xl">
+              <div>
+                <h3 className="text-sm font-black text-white flex items-center gap-2">
+                  <span>{isVitrinaPublic ? '🌐 Tu Vitrina es PÚBLICA' : '🔒 Tu Vitrina es PRIVADA'}</span>
+                </h3>
+                <p className="text-xs text-gray-400 mt-1">
+                  {isVitrinaPublic 
+                    ? 'Cualquier coleccionista con tu enlace puede explorar tu vitrina e inspeccionar tus piezas.' 
+                    : 'Activa la opción pública para compartir tu colección en redes sociales como Instagram, TikTok o WhatsApp.'}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition shadow-lg shadow-pink-600/30 whitespace-nowrap"
+              >
+                📲 Compartir en Redes
+              </button>
+            </div>
+
             <h2 className="text-xl font-bold text-white mb-4">Mi Colección Personal ({myCollection.length})</h2>
             {myCollection.length === 0 ? (
               <div className="text-center py-12 bg-gray-900 rounded-2xl border border-gray-800 text-gray-400">
@@ -793,6 +841,82 @@ export default function App() {
         )}
 
       </main>
+
+      {/* MODAL: HACER PÚBLICA / COMPARTIR EN REDES SOCIALES */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl relative">
+            <button 
+              onClick={() => setShowShareModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-white font-bold text-sm"
+            >
+              ✕
+            </button>
+            
+            <h3 className="text-lg font-bold text-pink-500 mb-1">Compartir Tu Vitrina</h3>
+            <p className="text-xs text-gray-400 mb-4">Haz visible tu colección y compártela en redes sociales.</p>
+
+            {/* SWITCH HACER PÚBLICA */}
+            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800 flex items-center justify-between mb-5">
+              <div>
+                <p className="text-xs font-bold text-white">Estado de la Vitrina</p>
+                <p className="text-[10px] text-gray-400">{isVitrinaPublic ? 'Pública para todos los usuarios' : 'Privada (Solo accesible por ti)'}</p>
+              </div>
+              <button
+                onClick={() => setIsVitrinaPublic(!isVitrinaPublic)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition ${
+                  isVitrinaPublic 
+                    ? 'bg-pink-600 text-white' 
+                    : 'bg-gray-800 text-gray-400 border border-gray-700'
+                }`}
+              >
+                {isVitrinaPublic ? 'PÚBLICA' : 'PRIVADA'}
+              </button>
+            </div>
+
+            {/* BOTONES DIRECTOS PARA REDES */}
+            <div className="space-y-2">
+              <a
+                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(getShareText())}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between bg-green-950/40 hover:bg-green-900/60 border border-green-700/50 p-3 rounded-xl transition text-xs font-bold text-green-300"
+              >
+                <span>💬 Compartir en WhatsApp</span>
+                <span>Enviar ➔</span>
+              </a>
+
+              <a
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(getShareText())}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between bg-sky-950/40 hover:bg-sky-900/60 border border-sky-700/50 p-3 rounded-xl transition text-xs font-bold text-sky-300"
+              >
+                <span>🐦 Publicar en X (Twitter)</span>
+                <span>Postear ➔</span>
+              </a>
+
+              <a
+                href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getPublicVitrinaUrl())}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between bg-blue-950/40 hover:bg-blue-900/60 border border-blue-700/50 p-3 rounded-xl transition text-xs font-bold text-blue-300"
+              >
+                <span>📘 Compartir en Facebook</span>
+                <span>Publicar ➔</span>
+              </a>
+
+              <button
+                onClick={handleCopyShareLink}
+                className="w-full flex items-center justify-between bg-gray-800 hover:bg-gray-700 border border-gray-700 p-3 rounded-xl transition text-xs font-bold text-gray-200 mt-2"
+              >
+                <span>🔗 {copiedLink ? '¡Enlace Copiado al Portapapeles!' : 'Copiar Enlace Directo'}</span>
+                <span>{copiedLink ? '✓' : 'Copiar'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: BUSCADOR DE PRECIOS MULTISITIO */}
       {comparePriceItem && (
