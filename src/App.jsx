@@ -20,39 +20,6 @@ const BarbieSilhouetteFallback = () => (
   </div>
 );
 
-// Procesador de fondo blanco estilo estudio
-const processWhiteStudioBackground = (base64Img) => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.src = base64Img;
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width || 600;
-      canvas.height = img.height || 800;
-      const ctx = canvas.getContext('2d');
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      const gradient = ctx.createRadialGradient(
-        canvas.width / 2, canvas.height * 0.85, 10,
-        canvas.width / 2, canvas.height * 0.85, canvas.width * 0.4
-      );
-      gradient.addColorStop(0, 'rgba(210, 210, 210, 0.6)');
-      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.ellipse(canvas.width / 2, canvas.height * 0.85, canvas.width * 0.35, canvas.height * 0.05, 0, 0, 2 * Math.PI);
-      ctx.fill();
-
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.9));
-    };
-    img.onerror = () => resolve(base64Img);
-  });
-};
-
 function getBarbieLoreFallback(name, line, year) {
   return `Edición oficial de Mattel lanzada en ${year || 'año no especificado'}. Formó parte de la línea ${line || 'Colección General'}, siendo un elemento muy valorado por coleccionistas.`;
 }
@@ -109,11 +76,12 @@ export default function App() {
     notes: ''
   });
 
-  // Escáner IA (gemini-3.6-flash)
+  // Escáner IA
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [scannedImageBase64, setScannedImageBase64] = useState(null);
   const [debugError, setDebugError] = useState(null);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
 
   // Moneda
   const [currency, setCurrency] = useState('EUR');
@@ -218,7 +186,6 @@ export default function App() {
     });
   };
 
-  // APERTURA DE INSPECTOR DE VITRINA
   const handleOpenVitrinaDoll = (barbie) => {
     setSelectedVitrinaDoll(barbie);
     setDoorsOpened(false);
@@ -228,7 +195,6 @@ export default function App() {
     }, 150);
   };
 
-  // CIERRE DE INSPECTOR EN 2 PASOS (CIERRA PUERTAS PRIMERO)
   const handleCloseVitrinaDoll = () => {
     setDoorsOpened(false);
     setTimeout(() => {
@@ -289,62 +255,63 @@ export default function App() {
     setEditingLoreItem(null);
   };
 
-  // GUARDADO ROBUSTO: VINCULA CON barbies_master PRIMERO SI VIENE DEL ESCÁNER DE FOTOS
+  // NUEVA LÓGICA: GUARDA DIRECTAMENTE AL CATÁLOGO MAESTRO (barbies_master)
+  const handleSaveDirectToCatalog = async () => {
+    if (!scanResult?.primary_match) return;
+
+    const match = scanResult.primary_match;
+
+    const payloadMaster = {
+      name: match.name || 'Barbie Desconocida',
+      collection_line: match.collection_line || 'Edición Especial',
+      release_year: Number(match.release_year) || new Date().getFullYear(),
+      lore: match.lore || match.description || getBarbieLoreFallback(match.name, match.collection_line, match.release_year),
+      estimated_min_price: Number(match.estimated_min_price) || 35,
+      image_url: scannedImageBase64 || null
+    };
+
+    if (supabase) {
+      const { error } = await supabase.from('barbies_master').insert([payloadMaster]);
+      if (error) {
+        console.error("Error al guardar en barbies_master:", error);
+        setDebugError(`Error guardando en catálogo: ${error.message}`);
+        return;
+      }
+    } else {
+      setMasterCatalog(prev => [...prev, { ...payloadMaster, id: Date.now() }]);
+    }
+
+    await fetchData();
+    setScanResult(null);
+    setScannedImageBase64(null);
+    setSaveSuccessMsg('¡Barbie guardada con éxito en el Catálogo Maestro! 📖');
+    setTimeout(() => setSaveSuccessMsg(''), 3000);
+    setActiveTab('catalog');
+  };
+
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie) return;
 
     const barbieSource = activeModal.barbie;
-    let masterBarbieId = barbieSource.id || barbieSource.barbie_id || null;
+
+    const payload = {
+      user_id: session?.user?.id || 'default-user',
+      barbie_id: barbieSource.id,
+      name: barbieSource.name,
+      quantity: Math.max(1, Number(userBarbieForm.quantity || 1)),
+      condition: userBarbieForm.condition ? userBarbieForm.condition.split(' ')[0] : 'NIB'
+    };
 
     if (supabase) {
-      // 1. Si no existe ID maestro (caso de escáner desde ordenador), creamos el registro primero en barbies_master
-      if (!masterBarbieId) {
-        const { data: newMaster, error: masterErr } = await supabase
-          .from('barbies_master')
-          .insert([{
-            name: barbieSource.name || 'Barbie Escaneada',
-            collection_line: barbieSource.collection_line || 'Colección Personal',
-            release_year: Number(barbieSource.release_year) || new Date().getFullYear(),
-            lore: barbieSource.lore || getBarbieLoreFallback(barbieSource.name, barbieSource.collection_line, barbieSource.release_year),
-            estimated_min_price: Number(barbieSource.estimated_min_price) || 35,
-            image_url: barbieSource.image_url || null
-          }])
-          .select()
-          .single();
-
-        if (masterErr) {
-          console.error("Error al registrar en barbies_master:", masterErr);
-        } else if (newMaster) {
-          masterBarbieId = newMaster.id;
-        }
-      }
-
-      // 2. Insertamos la entrada en user_collection
-      const payload = {
-        user_id: session?.user?.id || 'default-user',
-        barbie_id: masterBarbieId,
-        name: barbieSource.name,
-        quantity: Math.max(1, Number(userBarbieForm.quantity || 1)),
-        condition: userBarbieForm.condition ? userBarbieForm.condition.split(' ')[0] : 'NIB'
-      };
-
-      const { error: colErr } = await supabase.from('user_collection').insert([payload]);
-
-      if (colErr) {
-        console.error("Error al insertar en user_collection:", colErr);
-      } else {
-        await fetchData();
-      }
+      const { error } = await supabase.from('user_collection').insert([payload]);
+      if (error) console.error("Error al insertar en user_collection:", error);
+      else await fetchData();
     } else {
       setMyCollection(prev => [...prev, { ...barbieSource, userInstanceId: Date.now(), quantity: 1 }]);
     }
 
-    // Resetear estados y navegar a Vitrina
     setActiveModal(null);
-    setScanResult(null);
-    setScannedImageBase64(null);
-    setUserBarbieForm({ quantity: 1, condition: 'NFRB (Caja Original Precintada)', customPrice: '', serialNumber: '', notes: '' });
     setActiveTab('vitrina');
   };
 
@@ -374,10 +341,27 @@ export default function App() {
         setScannedImageBase64(fullBase64);
         const base64Data = fullBase64.split(',')[1];
 
+        // PROMPT OPTIMIZADO PARA GENERAR HISTORIA DETALLADA Y RIGUROSA
+        const promptInstruction = `Identifica la Barbie de esta foto de forma precisa para un catálogo de coleccionismo.
+Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
+{
+  "primary_match": {
+    "name": "Nombre completo del modelo o personaje",
+    "collection_line": "Línea oficial o temática de Mattel",
+    "release_year": 2000,
+    "estimated_min_price": 45,
+    "lore": "Redacta una historia rica e informativa estructurada para coleccionistas. Incluye: 1) Detalles del vestuario y paleta de colores. 2) Concepto estético o inspiración. 3) Molde facial/escultura de rostro usado (ej. Superstar, Generation Girl, Mackie) y estética de maquillaje. 4) Accesorios y extras incluidos."
+  }
+}`;
+
         const response = await fetch('/api/scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: base64Data, mimeType: 'image/jpeg' })
+          body: JSON.stringify({ 
+            imageBase64: base64Data, 
+            mimeType: 'image/jpeg',
+            prompt: promptInstruction
+          })
         });
 
         const data = await response.json();
@@ -486,7 +470,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* MÉTRICAS COMPACTAS DESPLEGABLES */}
+        {/* MÉTRICAS COMPACTAS */}
         {showMobileMetrics && (
           <div className="mt-2 pt-2 border-t border-gray-800 grid grid-cols-3 gap-2 text-center text-xs animate-fadeIn">
             <div className="bg-gray-950 p-2 rounded-lg border border-gray-800">
@@ -525,33 +509,29 @@ export default function App() {
 
             {myCollection.length === 0 ? (
               <div className="text-center py-10 bg-gray-900 rounded-xl border border-gray-800 text-gray-400 text-xs px-4">
-                Aún no tienes muñecas en tu Vitrina. Usa el catálogo o el escáner para añadir la primera.
+                Aún no tienes muñecas en tu Vitrina. Usa el catálogo para añadir tus Barbies.
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {myCollection.map((item) => (
                   <div key={item.userInstanceId || item.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between group">
                     <div>
-                      {/* CAJA DE VITRINA 3D EN LA VISTA PRINCIPAL CON PUERTAS DE CRISTAL ACTIVAS */}
+                      {/* CAJA DE VITRINA 3D */}
                       <div 
                         onClick={() => handleOpenVitrinaDoll(item)}
                         className="h-44 bg-gradient-to-b from-pink-950/30 via-black to-gray-950 p-2 flex items-center justify-center relative cursor-pointer overflow-hidden border-b border-gray-800"
                         style={{ perspective: '600px' }}
                       >
-                        {/* ILUMINACIÓN INTERIOR DE FOCO */}
                         <div className="absolute top-0 w-24 h-24 bg-pink-500/20 rounded-full blur-lg pointer-events-none"></div>
 
-                        {/* MUÑECA DENTRO DE LA VITRINA */}
                         {item.image_url ? (
                           <img src={item.image_url} alt={item.name} className="max-h-full object-contain rounded-md transition duration-500 group-hover:scale-105 filter drop-shadow-[0_4px_6px_rgba(236,72,153,0.3)] z-10" />
                         ) : (
                           <BarbieSilhouetteFallback />
                         )}
 
-                        {/* ESTANTE DE CRISTAL INFERIOR */}
                         <div className="absolute bottom-2 w-3/4 h-1 bg-gradient-to-r from-transparent via-pink-400/40 to-transparent rounded-full blur-[1px]"></div>
 
-                        {/* PUERTA IZQUIERDA DE CRISTAL (SE ABRE AL PASAR EL CURSOR O TOCAR) */}
                         <div 
                           className="absolute top-0 left-0 w-1/2 h-full bg-pink-400/10 border-r border-white/40 backdrop-blur-[1px] transition-transform duration-500 ease-in-out origin-left flex items-center justify-end pr-1 pointer-events-none z-20 group-hover:-rotate-y-100"
                           style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
@@ -559,7 +539,6 @@ export default function App() {
                           <div className="w-1 h-8 bg-white/40 rounded-full shadow"></div>
                         </div>
 
-                        {/* PUERTA DERECHA DE CRISTAL (SE ABRE AL PASAR EL CURSOR O TOCAR) */}
                         <div 
                           className="absolute top-0 right-0 w-1/2 h-full bg-pink-400/10 border-l border-white/40 backdrop-blur-[1px] transition-transform duration-500 ease-in-out origin-right flex items-center justify-start pl-1 pointer-events-none z-20 group-hover:rotate-y-100"
                           style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
@@ -572,7 +551,6 @@ export default function App() {
                         </span>
                       </div>
 
-                      {/* TEXTOS DE LA MUÑECA */}
                       <div className="p-2.5">
                         <p className="text-[9px] text-pink-400 font-bold uppercase truncate">{item.collection_line}</p>
                         <h3 
@@ -615,16 +593,22 @@ export default function App() {
           </section>
         )}
 
-        {/* TAB: ESCÁNER */}
+        {/* TAB: ESCÁNER CON GUARDADO DIRECTO AL CATÁLOGO MAESTRO */}
         {activeTab === 'scan' && (
           <section className="max-w-md mx-auto bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl">
             <h2 className="text-base font-extrabold text-pink-500 text-center mb-1">Escáner de Catalogación IA</h2>
-            <p className="text-[11px] text-gray-400 text-center mb-4">Fotografía la Barbie para identificarla y guardarla con acabado de estudio.</p>
+            <p className="text-[11px] text-gray-400 text-center mb-4">Fotografía la Barbie para identificarla y registrarla directamente en el Catálogo Maestro.</p>
+
+            {saveSuccessMsg && (
+              <div className="mb-3 p-2 bg-green-950/80 border border-green-600 text-green-300 text-xs text-center rounded-lg font-bold">
+                {saveSuccessMsg}
+              </div>
+            )}
 
             <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-700 rounded-xl p-4 bg-gray-950">
               <label className="bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer transition shadow-lg shadow-pink-600/30">
-                📷 Abrir Cámara / Foto
-                <input type="file" accept="image/*" capture="environment" onChange={handleScanImage} className="hidden" />
+                📷 Seleccionar Imagen / Cámara
+                <input type="file" accept="image/*" onChange={handleScanImage} className="hidden" />
               </label>
 
               {scannedImageBase64 && (
@@ -636,7 +620,7 @@ export default function App() {
 
             {scanning && (
               <div className="mt-4 p-3 bg-gray-950 rounded-lg border border-pink-900/50 text-center text-pink-400 font-bold text-xs animate-pulse">
-                Identificando modelo con Gemini 3.6-flash...
+                Identificando modelo y redactando historia documental...
               </div>
             )}
 
@@ -650,28 +634,21 @@ export default function App() {
               <div className="mt-4 bg-gray-950 border border-pink-600/40 rounded-xl p-4">
                 <span className="bg-pink-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase">Identificada</span>
                 <h3 className="text-sm font-black text-white mt-1">{scanResult.primary_match.name}</h3>
-                <p className="text-[10px] text-pink-400 font-bold">{scanResult.primary_match.collection_line} ({scanResult.primary_match.release_year})</p>
+                <p className="text-[10px] text-pink-400 font-bold mb-2">{scanResult.primary_match.collection_line} ({scanResult.primary_match.release_year})</p>
+                <p className="text-[11px] text-gray-300 leading-relaxed bg-gray-900/80 p-2.5 rounded-lg border border-gray-800 max-h-44 overflow-y-auto mb-3">
+                  {scanResult.primary_match.lore}
+                </p>
 
-                <div className="mt-3 pt-3 border-t border-gray-800 flex justify-between items-center">
+                <div className="pt-2 border-t border-gray-800 flex justify-between items-center">
                   <div>
-                    <p className="text-[8px] text-gray-500 uppercase font-bold">Estimación</p>
+                    <p className="text-[8px] text-gray-500 uppercase font-bold">Valor Estimado</p>
                     <p className="text-sm font-bold text-pink-400">{scanResult.primary_match.estimated_min_price} €</p>
                   </div>
                   <button 
-                    onClick={() => setActiveModal({ 
-                      type: 'add_to_vitrina', 
-                      barbie: {
-                        name: scanResult.primary_match.name,
-                        collection_line: scanResult.primary_match.collection_line,
-                        release_year: scanResult.primary_match.release_year,
-                        estimated_min_price: scanResult.primary_match.estimated_min_price,
-                        lore: scanResult.primary_match.lore,
-                        image_url: scannedImageBase64
-                      }
-                    })}
-                    className="bg-pink-600 hover:bg-pink-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow-md"
+                    onClick={handleSaveDirectToCatalog}
+                    className="bg-pink-600 hover:bg-pink-500 text-white text-xs px-4 py-2 rounded-lg font-bold transition shadow-md flex items-center gap-1"
                   >
-                    ✨ Guardar
+                    📖 Guardar en Catálogo Maestro
                   </button>
                 </div>
               </div>
@@ -760,7 +737,7 @@ export default function App() {
                             onClick={() => setActiveModal({ type: 'add_to_vitrina', barbie })}
                             className="bg-pink-600 text-white text-[10px] font-bold py-1 rounded w-2/3"
                           >
-                            + Añadir
+                            + Añadir a Vitrina
                           </button>
                         </div>
                       </div>
@@ -824,7 +801,7 @@ export default function App() {
 
       </main>
 
-      {/* MODAL 3D: INSPECTOR DE VITRINA AMPLIO CON ANIMACIÓN DE ENTRADA Y SALIDA */}
+      {/* MODAL 3D: INSPECTOR DE VITRINA */}
       {showVitrinaDoorsModal && selectedVitrinaDoll && (
         <div 
           onClick={handleCloseVitrinaDoll}
@@ -834,8 +811,6 @@ export default function App() {
             onClick={(e) => e.stopPropagation()} 
             className="relative w-full max-w-sm bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 border-2 border-pink-900/60 rounded-2xl overflow-hidden shadow-2xl p-3 my-auto max-h-[85vh] flex flex-col justify-between"
           >
-            
-            {/* BOTÓN DE CIERRE CON SECUENCIA DE APERTURA/CIERRE DE PUERTAS */}
             <button 
               onClick={handleCloseVitrinaDoll}
               className="absolute top-2 right-2 text-gray-300 hover:text-white font-black text-xs bg-gray-900/90 rounded-full w-7 h-7 flex items-center justify-center z-50 border border-gray-700 shadow-md transition hover:bg-pink-600"
@@ -843,15 +818,12 @@ export default function App() {
               ✕
             </button>
 
-            {/* CAJA DE VITRINA 3D */}
             <div 
               className="relative w-full h-60 bg-gradient-to-b from-pink-950/40 via-black to-gray-950 rounded-xl overflow-hidden border border-pink-500/30 flex items-center justify-center mb-3 shrink-0"
               style={{ perspective: '900px' }}
             >
-              {/* LUZ DE FOCO */}
               <div className="absolute top-0 w-28 h-28 bg-pink-500/25 rounded-full blur-xl pointer-events-none"></div>
 
-              {/* MUÑECA DENTRO DE LA VITRINA */}
               <div className="z-10 h-52 p-1 flex items-center justify-center">
                 {selectedVitrinaDoll.image_url ? (
                   <img src={selectedVitrinaDoll.image_url} alt={selectedVitrinaDoll.name} className="max-h-full object-contain filter drop-shadow-[0_8px_8px_rgba(236,72,153,0.35)]" />
@@ -860,10 +832,8 @@ export default function App() {
                 )}
               </div>
 
-              {/* ESTANTE DE CRISTAL */}
               <div className="absolute bottom-3 w-3/4 h-1.5 bg-gradient-to-r from-transparent via-pink-400/50 to-transparent rounded-full blur-[1px]"></div>
 
-              {/* PUERTA IZQUIERDA DE CRISTAL TEMPLADO */}
               <div 
                 className="absolute top-0 left-0 w-1/2 h-full bg-pink-400/10 border-r border-white/40 backdrop-blur-[2px] transition-transform duration-500 ease-in-out origin-left flex items-center justify-end pr-1.5 pointer-events-none z-20"
                 style={{ 
@@ -875,7 +845,6 @@ export default function App() {
                 <div className="w-1 h-10 bg-white/50 rounded-full shadow-md"></div>
               </div>
 
-              {/* PUERTA DERECHA DE CRISTAL TEMPLADO */}
               <div 
                 className="absolute top-0 right-0 w-1/2 h-full bg-pink-400/10 border-l border-white/40 backdrop-blur-[2px] transition-transform duration-500 ease-in-out origin-right flex items-center justify-start pl-1.5 pointer-events-none z-20"
                 style={{ 
@@ -888,7 +857,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* DETALLES DE LA BARBIE */}
             <div className="text-left bg-gray-950/90 p-2.5 rounded-xl border border-pink-900/40 overflow-y-auto max-h-36">
               <span className="text-[8px] text-pink-400 font-extrabold uppercase tracking-widest">{selectedVitrinaDoll.collection_line} ({selectedVitrinaDoll.release_year})</span>
               <h3 className="text-xs font-black text-white mt-0.5 leading-snug">{selectedVitrinaDoll.name}</h3>
@@ -1090,7 +1058,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL: CONFIRMAR REGISTRO */}
+      {/* MODAL: CONFIRMAR REGISTRO A MI VITRINA */}
       {activeModal?.type === 'add_to_vitrina' && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-xs w-full">
