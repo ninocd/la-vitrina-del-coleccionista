@@ -74,7 +74,7 @@ export default function App() {
   const [myCollection, setMyCollection] = useState([]);
   const [wishlist, setWishlist] = useState([]);
 
-  // Interfaz
+  // Interfaz móvil / pública
   const [showMobileMetrics, setShowMobileMetrics] = useState(false);
   const [isVitrinaPublic, setIsVitrinaPublic] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -91,7 +91,7 @@ export default function App() {
   const [catalogSearchTerm, setCatalogSearchTerm] = useState('');
   const [selectedEraFilter, setSelectedEraFilter] = useState('Todas');
 
-  // Modales y Form
+  // Modales y Formularios
   const [editingLoreItem, setEditingLoreItem] = useState(null);
   const [certificateItem, setCertificateItem] = useState(null);
   const [comparePriceItem, setComparePriceItem] = useState(null);
@@ -123,36 +123,33 @@ export default function App() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchUserData(session.user.id);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) fetchUserData(session.user.id);
     });
 
-    fetchMasterCatalog();
+    fetchData();
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Cargar Catálogo Maestro
-  async function fetchMasterCatalog() {
+  // CARGAR CATÁLOGO MAESTRO Y VITRINA UNIFICADA DESDE SUPABASE
+  async function fetchData() {
     setLoading(true);
     try {
       if (!supabase) return;
 
-      const { data, error } = await supabase
+      // 1. Carga barbies_master
+      const { data: masterData, error: masterErr } = await supabase
         .from('barbies_master')
         .select('*')
         .order('release_year', { ascending: true });
 
-      if (error) {
-        console.error("Error cargando barbies_master:", error);
-        return;
-      }
+      if (masterErr) console.error("Error cargando barbies_master:", masterErr);
 
-      const catalog = (data || []).map((item) => {
+      const catalogMap = {};
+      const catalog = (masterData || []).map((item) => {
         const estimatedPrice = calculateDynamicPrice(item);
         const loreText = (item.lore && item.lore.trim() !== '') 
           ? item.lore 
@@ -160,41 +157,49 @@ export default function App() {
 
         const validImage = (item.image_url && !item.image_url.includes('unsplash')) ? item.image_url : null;
 
-        return { 
+        const processed = { 
           ...item, 
           image_url: validImage,
           estimated_min_price: estimatedPrice, 
           lore: loreText 
         };
+
+        catalogMap[item.id] = processed;
+        return processed;
       });
 
       setMasterCatalog(catalog);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }
 
-  // Cargar Vitrina del Usuario
-  async function fetchUserData(userId) {
-    if (!supabase) return;
-    try {
-      const { data: colData } = await supabase
-        .from('user_collections')
-        .select('*')
-        .eq('user_id', userId);
+      // 2. Carga user_collection (singular)
+      const { data: colData, error: colErr } = await supabase
+        .from('user_collection')
+        .select('*');
+
+      if (colErr) console.error("Error cargando user_collection:", colErr);
 
       if (colData) {
-        setMyCollection(colData.map(item => ({
-          ...item,
-          userInstanceId: item.id,
-          lore: item.lore || getBarbieLoreFallback(item.name, item.collection_line, item.release_year),
-          image_url: (item.image_url && !item.image_url.includes('unsplash')) ? item.image_url : null
-        })));
+        const userItems = colData.map(item => {
+          const matchedMaster = catalogMap[item.barbie_id] || {};
+          return {
+            ...matchedMaster,
+            ...item,
+            userInstanceId: item.id,
+            name: matchedMaster.name || item.name || 'Barbie Colección',
+            collection_line: matchedMaster.collection_line || item.collection_line || 'Mattel',
+            release_year: matchedMaster.release_year || item.release_year || 2000,
+            estimated_min_price: matchedMaster.estimated_min_price || item.estimated_min_price || 35,
+            lore: matchedMaster.lore || item.lore || getBarbieLoreFallback(item.name, item.collection_line, item.release_year),
+            image_url: matchedMaster.image_url || item.image_url || null,
+            condition: item.condition || 'NIB'
+          };
+        });
+
+        setMyCollection(userItems);
       }
     } catch (e) {
-      console.error(e);
+      console.error("Error general en fetchData:", e);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -221,7 +226,7 @@ export default function App() {
     });
   };
 
-  // GUARDADO PERMANENTE Y CORREGIDO EN SUPABASE
+  // GUARDADO PERMANENTE DEL LORE EN SUPABASE (barbies_master)
   const handleSaveAdminLore = async (e) => {
     e.preventDefault();
     if (!editingLoreItem) return;
@@ -230,31 +235,10 @@ export default function App() {
     const updatedLine = adminLoreForm.collection_line;
     const updatedYear = Number(adminLoreForm.release_year);
 
-    // 1. Guardar en la vitrina del usuario (si la pieza viene de user_collections)
-    if (editingLoreItem.userInstanceId && supabase) {
-      const { error: userErr } = await supabase
-        .from('user_collections')
-        .update({ 
-          lore: updatedLore, 
-          collection_line: updatedLine, 
-          release_year: updatedYear,
-          notes: `[HISTORIA OFICIAL]: ${updatedLore}` 
-        })
-        .eq('id', editingLoreItem.userInstanceId);
-
-      if (userErr) console.error("Error al actualizar user_collections:", userErr);
-
-      setMyCollection(prev => prev.map(item => 
-        item.userInstanceId === editingLoreItem.userInstanceId 
-          ? { ...item, lore: updatedLore, collection_line: updatedLine, release_year: updatedYear }
-          : item
-      ));
-    }
-
-    // 2. Guardar en el catálogo maestro (barbies_master)
-    const masterId = editingLoreItem.barbie_master_id || editingLoreItem.id;
+    const masterId = editingLoreItem.barbie_id || editingLoreItem.barbie_master_id || editingLoreItem.id;
+    
     if (masterId && supabase) {
-      const { error: masterErr } = await supabase
+      const { error } = await supabase
         .from('barbies_master')
         .update({ 
           lore: updatedLore, 
@@ -263,60 +247,39 @@ export default function App() {
         })
         .eq('id', masterId);
 
-      if (masterErr) console.error("Error al actualizar barbies_master:", masterErr);
-
-      setMasterCatalog(prev => prev.map(item => 
-        item.id === masterId 
-          ? { ...item, lore: updatedLore, collection_line: updatedLine, release_year: updatedYear }
-          : item
-      ));
+      if (error) {
+        console.error("Error al actualizar barbies_master:", error);
+      } else {
+        fetchData(); // Recarga todo para sincronizar el estado persistente
+      }
     }
 
     setEditingLoreItem(null);
   };
 
+  // AÑADIR A MI VITRINA (user_collection)
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie) return;
 
     const barbieSource = activeModal.barbie;
-    const finalLore = (barbieSource.lore && barbieSource.lore.trim() !== '')
-      ? barbieSource.lore
-      : getBarbieLoreFallback(barbieSource.name, barbieSource.collection_line, barbieSource.release_year);
-
-    let finalPriceInEUR = barbieSource.estimated_min_price || calculateDynamicPrice(barbieSource);
-    if (userBarbieForm.customPrice) {
-      const parsedCustom = parseFloat(userBarbieForm.customPrice);
-      finalPriceInEUR = currency === 'USD' ? parsedCustom / exchangeRateUSD : parsedCustom;
-    }
-
-    let processedImage = barbieSource.image_url || null;
-    if (processedImage && processedImage.startsWith('data:image')) {
-      processedImage = await processWhiteStudioBackground(processedImage);
-    }
 
     const payload = {
-      user_id: session?.user?.id || 'guest',
-      barbie_master_id: barbieSource.id || null,
-      name: barbieSource.name,
-      collection_line: barbieSource.collection_line,
-      release_year: Number(barbieSource.release_year),
-      estimated_min_price: Number(finalPriceInEUR),
-      image_url: processedImage,
+      user_id: session?.user?.id || 'default-user',
+      barbie_id: barbieSource.id || null,
       quantity: Math.max(1, Number(userBarbieForm.quantity || 1)),
-      condition: userBarbieForm.condition,
-      serial_number: userBarbieForm.serialNumber || `MAT-${barbieSource.release_year || '2026'}-${Math.floor(Math.random()*899+100)}`,
-      lore: finalLore,
-      notes: userBarbieForm.notes 
-        ? `${userBarbieForm.notes}\n\n[HISTORIA OFICIAL]: ${finalLore}` 
-        : `[HISTORIA OFICIAL]: ${finalLore}`
+      condition: userBarbieForm.condition ? userBarbieForm.condition.split(' ')[0] : 'NIB'
     };
 
-    if (supabase && session) {
-      await supabase.from('user_collections').insert([payload]);
-      fetchUserData(session.user.id);
+    if (supabase) {
+      const { error } = await supabase.from('user_collection').insert([payload]);
+      if (error) {
+        console.error("Error al insertar en user_collection:", error);
+      } else {
+        await fetchData(); // Sincroniza desde la BD
+      }
     } else {
-      setMyCollection(prev => [...prev, { ...payload, userInstanceId: Date.now() }]);
+      setMyCollection(prev => [...prev, { ...barbieSource, userInstanceId: Date.now(), quantity: payload.quantity, condition: payload.condition }]);
     }
 
     setActiveModal(null);
@@ -399,7 +362,7 @@ export default function App() {
   };
 
   const getPublicVitrinaUrl = () => {
-    const userId = session?.user?.id || 'demo';
+    const userId = session?.user?.id || 'default-user';
     return `${window.location.origin}/?vitrina=${userId}`;
   };
 
@@ -508,7 +471,7 @@ export default function App() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {myCollection.map((item) => (
-                  <div key={item.userInstanceId} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between">
+                  <div key={item.userInstanceId || item.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between">
                     <div>
                       <div className="h-40 bg-gray-950 p-2 flex items-center justify-center relative">
                         {item.image_url ? (
@@ -517,7 +480,7 @@ export default function App() {
                           <BarbieSilhouetteFallback />
                         )}
                         <span className="absolute top-1.5 left-1.5 bg-gray-900/90 text-gray-300 text-[8px] px-1.5 py-0.5 rounded font-bold">
-                          {item.condition ? item.condition.split(' ')[0] : 'NFRB'}
+                          {item.condition || 'NIB'}
                         </span>
                       </div>
                       <div className="p-2.5">
@@ -720,7 +683,7 @@ export default function App() {
             ) : (
               <div className="space-y-3">
                 {myCollection.map((item) => (
-                  <div key={item.userInstanceId} className="bg-gray-950 p-3 rounded-lg border border-gray-800 text-xs">
+                  <div key={item.userInstanceId || item.id} className="bg-gray-950 p-3 rounded-lg border border-gray-800 text-xs">
                     <h3 className="font-bold text-white">{item.name}</h3>
                     <p className="text-[10px] text-pink-400">{item.collection_line} ({item.release_year})</p>
 
