@@ -64,16 +64,12 @@ export default function App() {
 
   // Modales y Formularios
   const [editingLoreItem, setEditingLoreItem] = useState(null);
-  const [certificateItem, setCertificateItem] = useState(null);
   const [comparePriceItem, setComparePriceItem] = useState(null);
   const [adminLoreForm, setAdminLoreForm] = useState({ name: '', lore: '', collection_line: '', release_year: '' });
   const [activeModal, setActiveModal] = useState(null);
   const [userBarbieForm, setUserBarbieForm] = useState({
     quantity: 1,
-    condition: 'NFRB (Caja Original Precintada)',
-    customPrice: '',
-    serialNumber: '',
-    notes: ''
+    condition: 'NFRB (Caja Original Precintada)'
   });
 
   // Escáner IA
@@ -255,7 +251,39 @@ export default function App() {
     setEditingLoreItem(null);
   };
 
-  // NUEVA LÓGICA: GUARDA DIRECTAMENTE AL CATÁLOGO MAESTRO (barbies_master)
+  // ELIMINAR DE MI VITRINA
+  const handleDeleteFromVitrina = async (userInstanceId) => {
+    if (!window.confirm("¿Seguro que deseas quitar esta Barbie de tu vitrina?")) return;
+
+    if (supabase) {
+      const { error } = await supabase
+        .from('user_collection')
+        .delete()
+        .eq('id', userInstanceId);
+
+      if (error) console.error("Error al eliminar de user_collection:", error);
+    }
+
+    setMyCollection(prev => prev.filter(item => item.userInstanceId !== userInstanceId));
+  };
+
+  // ELIMINAR DEL CATÁLOGO MAESTRO
+  const handleDeleteFromCatalog = async (masterId) => {
+    if (!window.confirm("¿Seguro que deseas borrar esta Barbie del Catálogo Maestro?")) return;
+
+    if (supabase) {
+      // 1. Eliminar referencias en user_collection primero para evitar errores de clave foránea
+      await supabase.from('user_collection').delete().eq('barbie_id', masterId);
+
+      // 2. Eliminar de barbies_master
+      const { error } = await supabase.from('barbies_master').delete().eq('id', masterId);
+      if (error) console.error("Error al eliminar de barbies_master:", error);
+    }
+
+    await fetchData();
+  };
+
+  // GUARDA DIRECTAMENTE EN EL CATÁLOGO MAESTRO (barbies_master) DESDE EL ESCÁNER
   const handleSaveDirectToCatalog = async () => {
     if (!scanResult?.primary_match) return;
 
@@ -289,26 +317,33 @@ export default function App() {
     setActiveTab('catalog');
   };
 
+  // AÑADIR A MI VITRINA DESDE EL CATÁLOGO MAESTRO (CORREGIDO)
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie) return;
 
     const barbieSource = activeModal.barbie;
-
-    const payload = {
-      user_id: session?.user?.id || 'default-user',
-      barbie_id: barbieSource.id,
-      name: barbieSource.name,
-      quantity: Math.max(1, Number(userBarbieForm.quantity || 1)),
-      condition: userBarbieForm.condition ? userBarbieForm.condition.split(' ')[0] : 'NIB'
-    };
+    const condClean = userBarbieForm.condition ? userBarbieForm.condition.split(' ')[0] : 'NIB';
 
     if (supabase) {
+      const payload = {
+        user_id: session?.user?.id || 'default-user',
+        barbie_id: barbieSource.id,
+        name: barbieSource.name,
+        quantity: Math.max(1, Number(userBarbieForm.quantity || 1)),
+        condition: condClean
+      };
+
       const { error } = await supabase.from('user_collection').insert([payload]);
-      if (error) console.error("Error al insertar en user_collection:", error);
-      else await fetchData();
+
+      if (error) {
+        console.error("Error al insertar en user_collection:", error);
+        alert(`No se pudo añadir a la vitrina: ${error.message}`);
+      } else {
+        await fetchData();
+      }
     } else {
-      setMyCollection(prev => [...prev, { ...barbieSource, userInstanceId: Date.now(), quantity: 1 }]);
+      setMyCollection(prev => [...prev, { ...barbieSource, userInstanceId: Date.now(), quantity: 1, condition: condClean }]);
     }
 
     setActiveModal(null);
@@ -341,7 +376,6 @@ export default function App() {
         setScannedImageBase64(fullBase64);
         const base64Data = fullBase64.split(',')[1];
 
-        // PROMPT OPTIMIZADO PARA GENERAR HISTORIA DETALLADA Y RIGUROSA
         const promptInstruction = `Identifica la Barbie de esta foto de forma precisa para un catálogo de coleccionismo.
 Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 {
@@ -514,7 +548,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {myCollection.map((item) => (
-                  <div key={item.userInstanceId || item.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between group">
+                  <div key={item.userInstanceId || item.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between group relative">
                     <div>
                       {/* CAJA DE VITRINA 3D */}
                       <div 
@@ -532,6 +566,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
                         <div className="absolute bottom-2 w-3/4 h-1 bg-gradient-to-r from-transparent via-pink-400/40 to-transparent rounded-full blur-[1px]"></div>
 
+                        {/* PUERTAS DE CRISTAL INTERACTIVAS */}
                         <div 
                           className="absolute top-0 left-0 w-1/2 h-full bg-pink-400/10 border-r border-white/40 backdrop-blur-[1px] transition-transform duration-500 ease-in-out origin-left flex items-center justify-end pr-1 pointer-events-none z-20 group-hover:-rotate-y-100"
                           style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
@@ -567,22 +602,24 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                         </p>
                       </div>
                     </div>
+                    
+                    {/* BOTONES DE ACCIÓN EN VITRINA (INCLUYE ELIMINAR) */}
                     <div className="p-2 border-t border-gray-800 bg-gray-950 flex items-center justify-between">
                       <span className="text-pink-400 font-extrabold text-xs">{item.estimated_min_price} €</span>
                       <div className="flex gap-1">
-                        <button 
-                          onClick={() => setCertificateItem(item)}
-                          className="bg-pink-950 text-pink-300 text-[10px] p-1 rounded font-bold hover:bg-pink-900"
-                          title="Certificado"
-                        >
-                          📜
-                        </button>
                         <button 
                           onClick={() => handleOpenEditLore(item)}
                           className="bg-gray-800 text-gray-300 text-[10px] p-1 rounded font-bold hover:bg-gray-700"
                           title="Editar Nombre e Historia"
                         >
                           ✏️
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteFromVitrina(item.userInstanceId)}
+                          className="bg-red-950/80 text-red-300 border border-red-800/60 text-[10px] p-1 rounded font-bold hover:bg-red-900"
+                          title="Eliminar de Mi Vitrina"
+                        >
+                          🗑️
                         </button>
                       </div>
                     </div>
@@ -715,6 +752,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                         </div>
                       </div>
 
+                      {/* CONTROLES DEL CATÁLOGO MAESTRO (AÑADIR, EDITAR Y ELIMINAR DUPLICADOS) */}
                       <div className="p-2 border-t border-gray-800/80 bg-gray-950 flex flex-col gap-1.5">
                         <div className="flex justify-between items-center">
                           <span className="text-pink-400 font-extrabold text-xs">{barbie.estimated_min_price} €</span>
@@ -728,16 +766,23 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                         <div className="flex gap-1">
                           <button 
                             onClick={() => handleOpenEditLore(barbie)}
-                            className="bg-gray-800 text-gray-300 text-[10px] p-1 rounded font-bold w-1/3 flex justify-center"
+                            className="bg-gray-800 text-gray-300 text-[10px] p-1 rounded font-bold w-1/4 flex justify-center hover:bg-gray-700"
                             title="Editar Nombre e Historia"
                           >
                             ✏️
                           </button>
                           <button 
-                            onClick={() => setActiveModal({ type: 'add_to_vitrina', barbie })}
-                            className="bg-pink-600 text-white text-[10px] font-bold py-1 rounded w-2/3"
+                            onClick={() => handleDeleteFromCatalog(barbie.id)}
+                            className="bg-red-950/80 text-red-300 border border-red-800/60 text-[10px] p-1 rounded font-bold w-1/4 flex justify-center hover:bg-red-900"
+                            title="Borrar del Catálogo Maestro"
                           >
-                            + Añadir a Vitrina
+                            🗑️
+                          </button>
+                          <button 
+                            onClick={() => setActiveModal({ type: 'add_to_vitrina', barbie })}
+                            className="bg-pink-600 text-white text-[10px] font-bold py-1 rounded w-2/4 hover:bg-pink-500"
+                          >
+                            + Añadir
                           </button>
                         </div>
                       </div>
@@ -913,7 +958,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         </div>
       </nav>
 
-      {/* MODAL: EDITAR HISTORIA / NOMBRE / LÍNEA (ADMIN) */}
+      {/* MODAL: EDITAR HISTORIA / NOMBRE / LÍNEA */}
       {editingLoreItem && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-sm w-full">
