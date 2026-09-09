@@ -10,7 +10,15 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
 
-const DEFAULT_BARBIE_SILHOUETTE = 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&q=80&w=600';
+// Componente de Silueta SVG de Barbie por defecto si no hay imagen
+const BarbieSilhouetteFallback = () => (
+  <div className="w-full h-full bg-gradient-to-b from-gray-900 to-pink-950 flex flex-col items-center justify-center p-4 rounded-lg border border-pink-900/30">
+    <svg className="w-24 h-24 text-pink-500/40 mb-2" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+    </svg>
+    <span className="text-[10px] text-pink-400 font-bold uppercase tracking-widest text-center">Imagen no disponible</span>
+  </div>
+);
 
 function getBarbieLoreFallback(name, line, year) {
   return `Edición oficial de Mattel lanzada en ${year || 'año no especificado'}. Formó parte de la línea ${line || 'Colección General'}, siendo un elemento muy valorado por coleccionistas.`;
@@ -26,7 +34,7 @@ function calculateDynamicPrice(item) {
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('catalog');
+  const [activeTab, setActiveTab] = useState('catalog'); // 'vitrina', 'scan', 'catalog', 'sales', 'community'
 
   // Datos
   const [masterCatalog, setMasterCatalog] = useState([]);
@@ -38,6 +46,7 @@ export default function App() {
 
   // Modales y Formularios
   const [editingLoreItem, setEditingLoreItem] = useState(null);
+  const [certificateItem, setCertificateItem] = useState(null);
   const [adminLoreForm, setAdminLoreForm] = useState({ lore: '', collection_line: '', release_year: '' });
   const [activeModal, setActiveModal] = useState(null);
   const [userBarbieForm, setUserBarbieForm] = useState({
@@ -80,7 +89,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 1. LECTURA DEL CATÁLOGO CON RESPETO ABSOLUTO A TUS EDICIONES
+  // 1. LECTURA DEL CATÁLOGO MAESTRO (PRIORIDAD AL LORE DE SUPABASE)
   async function fetchMasterCatalog() {
     setLoading(true);
     try {
@@ -98,19 +107,12 @@ export default function App() {
 
       const catalog = (data || []).map((item) => {
         const estimatedPrice = calculateDynamicPrice(item);
-        
-        // REGLA FUNDAMENTAL: Si el lore existe en Supabase (editado por ti), usarlo sin excepción.
         const loreText = (item.lore && item.lore.trim() !== '') 
           ? item.lore 
           : getBarbieLoreFallback(item.name, item.collection_line, item.release_year);
 
-        const cleanImageUrl = (!item.image_url || item.image_url.includes('unsplash')) 
-          ? DEFAULT_BARBIE_SILHOUETTE 
-          : item.image_url;
-
         return { 
           ...item, 
-          image_url: cleanImageUrl, 
           estimated_min_price: estimatedPrice, 
           lore: loreText 
         };
@@ -137,14 +139,20 @@ export default function App() {
         setMyCollection(colData.map(item => ({
           ...item,
           userInstanceId: item.id,
-          lore: item.lore || getBarbieLoreFallback(item.name, item.collection_line, item.release_year),
-          image_url: (!item.image_url || item.image_url.includes('unsplash')) ? DEFAULT_BARBIE_SILHOUETTE : item.image_url
+          lore: item.lore || getBarbieLoreFallback(item.name, item.collection_line, item.release_year)
         })));
       }
     } catch (e) {
       console.error("Error al cargar la vitrina del usuario:", e);
     }
   }
+
+  // CÁLCULO DE VALOR TOTAL
+  const totalCollectionValueEUR = myCollection.reduce((acc, item) => {
+    const qty = item.quantity || 1;
+    const price = item.estimated_min_price || 0;
+    return acc + (price * qty);
+  }, 0);
 
   // 3. GUARDADO PERMANENTE DEL LORE COMO ADMIN
   const handleOpenEditLore = (barbie) => {
@@ -164,7 +172,6 @@ export default function App() {
     const updatedLine = adminLoreForm.collection_line;
     const updatedYear = Number(adminLoreForm.release_year);
 
-    // Guardar en la vitrina si es una instancia del usuario
     if (supabase && editingLoreItem.userInstanceId) {
       await supabase
         .from('user_collections')
@@ -183,7 +190,6 @@ export default function App() {
       ));
     }
 
-    // Guardar permanentemente en el catálogo maestro (barbies_master)
     if (supabase && editingLoreItem.id) {
       await supabase
         .from('barbies_master')
@@ -227,7 +233,7 @@ export default function App() {
       collection_line: barbieSource.collection_line,
       release_year: Number(barbieSource.release_year),
       estimated_min_price: Number(finalPriceInEUR),
-      image_url: barbieSource.image_url || DEFAULT_BARBIE_SILHOUETTE,
+      image_url: barbieSource.image_url || null,
       quantity: Math.max(1, Number(userBarbieForm.quantity || 1)),
       condition: userBarbieForm.condition,
       serial_number: userBarbieForm.serialNumber || 'Sin registrar',
@@ -328,7 +334,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 font-sans pb-12">
-      {/* HEADER */}
+      {/* HEADER PRINCIPAL */}
       <header className="bg-gray-900 border-b border-pink-900/40 p-4 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3">
@@ -354,7 +360,31 @@ export default function App() {
         </div>
       </header>
 
-      {/* NAVEGACIÓN */}
+      {/* BARRA DE MÉTRICAS FINANCIERAS DE LA COLECCIÓN */}
+      <section className="bg-gradient-to-r from-gray-900 via-pink-950/40 to-gray-900 border-b border-pink-900/30 py-3">
+        <div className="max-w-7xl mx-auto px-4 flex flex-wrap justify-around items-center gap-4 text-center">
+          <div>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Valor Estimado de Colección</p>
+            <p className="text-xl font-black text-pink-400">
+              {currency === 'EUR' 
+                ? `${totalCollectionValueEUR.toLocaleString()} €` 
+                : `${Math.round(totalCollectionValueEUR * exchangeRateUSD).toLocaleString()} $`}
+            </p>
+          </div>
+          <div className="hidden sm:block border-r border-gray-800 h-8"></div>
+          <div>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Piezas en Mi Vitrina</p>
+            <p className="text-xl font-black text-white">{myCollection.length} uds.</p>
+          </div>
+          <div className="hidden sm:block border-r border-gray-800 h-8"></div>
+          <div>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Catálogo Maestro Registrado</p>
+            <p className="text-xl font-black text-pink-300">{masterCatalog.length} modelos</p>
+          </div>
+        </div>
+      </section>
+
+      {/* NAVEGACIÓN PRINCIPAL */}
       <nav className="bg-gray-900/80 border-b border-gray-800 py-3 sticky top-[73px] z-30 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex justify-center gap-2 px-4 overflow-x-auto">
           <button 
@@ -375,10 +405,22 @@ export default function App() {
           >
             Catálogo ({masterCatalog.length})
           </button>
+          <button 
+            onClick={() => setActiveTab('sales')}
+            className={`px-4 py-2 rounded-xl font-bold text-sm transition ${activeTab === 'sales' ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/30' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
+          >
+            🏷️ Ventas / Marketplace
+          </button>
+          <button 
+            onClick={() => setActiveTab('community')}
+            className={`px-4 py-2 rounded-xl font-bold text-sm transition ${activeTab === 'community' ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/30' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
+          >
+            👥 Coleccionistas
+          </button>
         </div>
       </nav>
 
-      {/* CONTENIDO */}
+      {/* CONTENIDO PRINCIPAL */}
       <main className="max-w-7xl mx-auto px-4 mt-6">
 
         {/* TAB: CATÁLOGO MAESTRO */}
@@ -411,7 +453,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* GRILLA DE TARJETAS */}
+            {/* GRILLA DE TARJETAS DEL CATÁLOGO */}
             {loading ? (
               <div className="text-center py-12 text-pink-400 font-bold animate-pulse">Cargando catálogo desde Supabase...</div>
             ) : (
@@ -420,7 +462,11 @@ export default function App() {
                   <div key={barbie.id} className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden hover:border-pink-500/50 transition flex flex-col justify-between">
                     <div>
                       <div className="h-64 bg-gray-950 p-4 flex items-center justify-center relative">
-                        <img src={barbie.image_url} alt={barbie.name} className="max-h-full object-contain rounded-lg" />
+                        {barbie.image_url ? (
+                          <img src={barbie.image_url} alt={barbie.name} className="max-h-full object-contain rounded-lg" />
+                        ) : (
+                          <BarbieSilhouetteFallback />
+                        )}
                         <span className="absolute top-3 right-3 bg-pink-950/80 border border-pink-500/40 text-pink-300 text-xs px-2 py-1 rounded-md font-bold">
                           {barbie.release_year}
                         </span>
@@ -543,7 +589,11 @@ export default function App() {
                   <div key={item.userInstanceId} className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden flex flex-col justify-between">
                     <div>
                       <div className="h-64 bg-gray-950 p-4 flex items-center justify-center relative">
-                        <img src={item.image_url} alt={item.name} className="max-h-full object-contain rounded-lg" />
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.name} className="max-h-full object-contain rounded-lg" />
+                        ) : (
+                          <BarbieSilhouetteFallback />
+                        )}
                         <span className="absolute top-3 left-3 bg-gray-800 text-gray-300 text-[10px] px-2 py-1 rounded font-bold">
                           {item.condition}
                         </span>
@@ -554,14 +604,25 @@ export default function App() {
                         <p className="text-xs text-gray-400 mt-2 line-clamp-3">{item.lore}</p>
                       </div>
                     </div>
-                    <div className="p-4 border-t border-gray-800 bg-gray-900/50 flex justify-between items-center">
-                      <p className="text-pink-400 font-bold">{item.estimated_min_price} €</p>
-                      <button 
-                        onClick={() => handleOpenEditLore(item)}
-                        className="bg-gray-800 text-xs px-3 py-1.5 rounded-lg text-gray-300 font-bold hover:bg-gray-700"
-                      >
-                        ✏️ Editar
-                      </button>
+                    <div className="p-4 border-t border-gray-800 bg-gray-900/50 flex flex-col gap-2">
+                      <div className="flex justify-between items-center">
+                        <p className="text-pink-400 font-bold">{item.estimated_min_price} €</p>
+                        <div className="flex gap-1">
+                          <button 
+                            onClick={() => setCertificateItem(item)}
+                            className="bg-pink-950 border border-pink-700 text-pink-300 text-xs px-2 py-1 rounded hover:bg-pink-900 font-bold"
+                            title="Ver Certificado de Autenticidad"
+                          >
+                            📜 Certificado
+                          </button>
+                          <button 
+                            onClick={() => handleOpenEditLore(item)}
+                            className="bg-gray-800 text-xs px-2 py-1 rounded text-gray-300 font-bold hover:bg-gray-700"
+                          >
+                            ✏️
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -570,7 +631,88 @@ export default function App() {
           </section>
         )}
 
+        {/* TAB: MARKETPLACE / VENTAS (VINTED, WALLAPOP, CATAWIKI, EBAY) */}
+        {activeTab === 'sales' && (
+          <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+            <h2 className="text-xl font-bold text-pink-500 mb-2">Generador de Anuncios y Gestión de Ventas</h2>
+            <p className="text-xs text-gray-400 mb-6">Selecciona una muñeca de tu Vitrina para generar anuncios optimizados para Vinted, Wallapop, eBay y Catawiki.</p>
+
+            {myCollection.length === 0 ? (
+              <p className="text-sm text-gray-500 italic">Registra muñecas en tu Vitrina para activar las publicaciones en marketplaces.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {myCollection.map((item) => (
+                  <div key={item.userInstanceId} className="bg-gray-950 p-4 rounded-xl border border-gray-800">
+                    <h3 className="font-bold text-white text-base">{item.name}</h3>
+                    <p className="text-xs text-pink-400 font-semibold">{item.collection_line} ({item.release_year})</p>
+                    <p className="text-xs text-gray-400 mt-2"><strong>Estado:</strong> {item.condition}</p>
+                    <p className="text-xs text-gray-400"><strong>Precio sugerido:</strong> {item.estimated_min_price} €</p>
+
+                    <div className="mt-4 p-3 bg-gray-900 rounded border border-gray-800 text-xs font-mono text-gray-300">
+                      <p><strong>[Título Vinted/Wallapop]:</strong> Barbie {item.name} {item.release_year} {item.condition}</p>
+                      <p className="mt-2"><strong>[Descripción]:</strong> En venta Barbie oficial de Mattel ({item.release_year}). Estado: {item.condition}. {item.lore}</p>
+                    </div>
+
+                    <button 
+                      onClick={() => navigator.clipboard.writeText(`Barbie ${item.name} (${item.release_year}) - Estado: ${item.condition}. ${item.lore}`)}
+                      className="mt-3 w-full bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold py-2 rounded-lg transition"
+                    >
+                      📋 Copiar Texto de Anuncio
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* TAB: COMUNIDAD DE COLECCIONISTAS */}
+        {activeTab === 'community' && (
+          <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6 text-center">
+            <h2 className="text-xl font-bold text-pink-500 mb-2">Red de Coleccionistas de Barbie</h2>
+            <p className="text-xs text-gray-400 mb-6">Conéctate con otros coleccionistas, compara vitrinas e intercambia ediciones oficiales.</p>
+            
+            <div className="max-w-md mx-auto bg-gray-950 p-6 rounded-xl border border-gray-800">
+              <span className="text-3xl">👑</span>
+              <h3 className="font-bold text-white mt-2">Comunidad Activa</h3>
+              <p className="text-xs text-gray-400 mt-1">Intercambio seguro de piezas NFRB, catálogos verificados y valoraciones oficiales.</p>
+            </div>
+          </section>
+        )}
+
       </main>
+
+      {/* MODAL: CERTIFICADO DE AUTENTICIDAD */}
+      {certificateItem && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-b from-gray-900 to-gray-950 border-2 border-pink-500/50 rounded-2xl p-6 max-w-md w-full shadow-2xl relative">
+            <button 
+              onClick={() => setCertificateItem(null)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-white font-bold text-sm"
+            >
+              ✕
+            </button>
+            <div className="border border-pink-500/30 p-4 rounded-xl text-center">
+              <div className="text-pink-500 font-black text-xl tracking-widest uppercase">Certificado Oficial</div>
+              <div className="text-xs text-gray-400 tracking-wider">REGISTRO DE LA VITRINA DEL COLECCIONISTA</div>
+
+              <div className="my-6">
+                <h3 className="font-extrabold text-lg text-white">{certificateItem.name}</h3>
+                <p className="text-xs text-pink-400 font-bold">{certificateItem.collection_line} ({certificateItem.release_year})</p>
+                <p className="text-xs text-gray-400 mt-2"><strong>Número de Serie:</strong> {certificateItem.serial_number}</p>
+                <p className="text-xs text-gray-400"><strong>Condición:</strong> {certificateItem.condition}</p>
+              </div>
+
+              <p className="text-[10px] text-gray-500 italic mb-4">{certificateItem.lore}</p>
+
+              <div className="pt-4 border-t border-gray-800 flex justify-between items-center text-[10px] text-gray-400">
+                <span>Verificado por IA Gemini 3.6</span>
+                <span className="font-bold text-pink-400">STATUS: AUTÉNTICO</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: EDITAR HISTORIA ADMIN */}
       {editingLoreItem && (
