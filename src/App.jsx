@@ -218,7 +218,7 @@ export default function App() {
     });
   };
 
-  // APERTURA DE INSPECTOR
+  // APERTURA DE INSPECTOR DE VITRINA
   const handleOpenVitrinaDoll = (barbie) => {
     setSelectedVitrinaDoll(barbie);
     setDoorsOpened(false);
@@ -289,31 +289,58 @@ export default function App() {
     setEditingLoreItem(null);
   };
 
+  // GUARDADO ROBUSTO: VINCULA CON barbies_master PRIMERO SI VIENE DEL ESCÁNER DE FOTOS
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie) return;
 
     const barbieSource = activeModal.barbie;
-
-    const payload = {
-      user_id: session?.user?.id || 'default-user',
-      barbie_id: barbieSource.id || null,
-      name: barbieSource.name,
-      quantity: Math.max(1, Number(userBarbieForm.quantity || 1)),
-      condition: userBarbieForm.condition ? userBarbieForm.condition.split(' ')[0] : 'NIB'
-    };
+    let masterBarbieId = barbieSource.id || barbieSource.barbie_id || null;
 
     if (supabase) {
-      const { error } = await supabase.from('user_collection').insert([payload]);
-      if (error) {
-        console.error("Error al insertar en user_collection:", error);
+      // 1. Si no existe ID maestro (caso de escáner desde ordenador), creamos el registro primero en barbies_master
+      if (!masterBarbieId) {
+        const { data: newMaster, error: masterErr } = await supabase
+          .from('barbies_master')
+          .insert([{
+            name: barbieSource.name || 'Barbie Escaneada',
+            collection_line: barbieSource.collection_line || 'Colección Personal',
+            release_year: Number(barbieSource.release_year) || new Date().getFullYear(),
+            lore: barbieSource.lore || getBarbieLoreFallback(barbieSource.name, barbieSource.collection_line, barbieSource.release_year),
+            estimated_min_price: Number(barbieSource.estimated_min_price) || 35,
+            image_url: barbieSource.image_url || null
+          }])
+          .select()
+          .single();
+
+        if (masterErr) {
+          console.error("Error al registrar en barbies_master:", masterErr);
+        } else if (newMaster) {
+          masterBarbieId = newMaster.id;
+        }
+      }
+
+      // 2. Insertamos la entrada en user_collection
+      const payload = {
+        user_id: session?.user?.id || 'default-user',
+        barbie_id: masterBarbieId,
+        name: barbieSource.name,
+        quantity: Math.max(1, Number(userBarbieForm.quantity || 1)),
+        condition: userBarbieForm.condition ? userBarbieForm.condition.split(' ')[0] : 'NIB'
+      };
+
+      const { error: colErr } = await supabase.from('user_collection').insert([payload]);
+
+      if (colErr) {
+        console.error("Error al insertar en user_collection:", colErr);
       } else {
         await fetchData();
       }
     } else {
-      setMyCollection(prev => [...prev, { ...barbieSource, userInstanceId: Date.now(), quantity: payload.quantity, condition: payload.condition }]);
+      setMyCollection(prev => [...prev, { ...barbieSource, userInstanceId: Date.now(), quantity: 1 }]);
     }
 
+    // Resetear estados y navegar a Vitrina
     setActiveModal(null);
     setScanResult(null);
     setScannedImageBase64(null);
