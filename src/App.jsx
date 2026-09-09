@@ -64,6 +64,8 @@ export default function App() {
 
   // Modales y Formularios
   const [editingLoreItem, setEditingLoreItem] = useState(null);
+  const [editingPriceItem, setEditingPriceItem] = useState(null);
+  const [newPriceValue, setNewPriceValue] = useState('');
   const [comparePriceItem, setComparePriceItem] = useState(null);
   const [adminLoreForm, setAdminLoreForm] = useState({ name: '', lore: '', collection_line: '', release_year: '' });
   const [activeModal, setActiveModal] = useState(null);
@@ -116,7 +118,7 @@ export default function App() {
 
       const catalogMap = {};
       const catalog = (masterData || []).map((item) => {
-        const estimatedPrice = calculateDynamicPrice(item);
+        const estimatedPrice = item.estimated_min_price ?? calculateDynamicPrice(item);
         const loreText = (item.lore && item.lore.trim() !== '') 
           ? item.lore 
           : getBarbieLoreFallback(item.name, item.collection_line, item.release_year);
@@ -238,6 +240,41 @@ export default function App() {
     setEditingLoreItem(null);
   };
 
+  // APERTURA Y GUARDADO DE EDICIÓN DE PRECIO DIRECTA
+  const handleOpenEditPrice = (barbie) => {
+    setEditingPriceItem(barbie);
+    setNewPriceValue(barbie.estimated_min_price || '');
+  };
+
+  const handleSavePrice = async (e) => {
+    e.preventDefault();
+    if (!editingPriceItem) return;
+
+    const priceNum = Number(newPriceValue);
+    if (isNaN(priceNum) || priceNum < 0) {
+      alert("Por favor introduce un precio válido.");
+      return;
+    }
+
+    const masterId = editingPriceItem.barbie_id || editingPriceItem.id;
+
+    if (masterId && supabase) {
+      const { error } = await supabase
+        .from('barbies_master')
+        .update({ estimated_min_price: priceNum })
+        .eq('id', masterId);
+
+      if (error) {
+        console.error("Error al actualizar precio en Supabase:", error);
+        alert(`Error al guardar el precio: ${error.message}`);
+      }
+    }
+
+    await fetchData();
+    setEditingPriceItem(null);
+    setNewPriceValue('');
+  };
+
   // ELIMINAR DE MI VITRINA
   const handleDeleteFromVitrina = async (userInstanceId) => {
     if (!window.confirm("¿Seguro que deseas quitar esta Barbie de tu vitrina?")) return;
@@ -258,32 +295,29 @@ export default function App() {
     setMyCollection(prev => prev.filter(item => item.userInstanceId !== userInstanceId));
   };
 
-  // ELIMINAR DEL CATÁLOGO MAESTRO (CON BORRADO FORZADO Y LIMPIEZA DE ESTADO)
+  // ELIMINAR DEL CATÁLOGO MAESTRO
   const handleDeleteFromCatalog = async (masterId) => {
     if (!window.confirm("¿Seguro que deseas borrar esta Barbie del Catálogo Maestro?")) return;
 
-    // Actualización reactiva inmediata en la interfaz
     setMasterCatalog(prev => prev.filter(item => item.id !== masterId));
     setMyCollection(prev => prev.filter(item => item.barbie_id !== masterId));
 
     if (supabase) {
       try {
-        // 1. Borrar de user_collection por clave foránea
         await supabase
           .from('user_collection')
           .delete()
           .eq('barbie_id', masterId);
 
-        // 2. Borrar de barbies_master
         const { error: masterErr } = await supabase
           .from('barbies_master')
           .delete()
           .eq('id', masterId);
 
         if (masterErr) {
-          console.error("Error directo de Supabase RLS/Constraint:", masterErr);
-          alert(`Aviso de Supabase: ${masterErr.message}. Verifica que RLS permita la acción DELETE en barbies_master.`);
-          await fetchData(); // Si falla en servidor, se revierte la UI
+          console.error("Error directo de Supabase:", masterErr);
+          alert(`Aviso de Supabase: ${masterErr.message}.`);
+          await fetchData();
         }
       } catch (err) {
         console.error("Excepción en borrado:", err);
@@ -617,6 +651,13 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                       <span className="text-pink-400 font-extrabold text-xs">{item.estimated_min_price} €</span>
                       <div className="flex gap-1">
                         <button 
+                          onClick={() => handleOpenEditPrice(item)}
+                          className="bg-gray-800 text-yellow-400 text-[10px] p-1 rounded font-bold hover:bg-gray-700"
+                          title="Cambiar Precio"
+                        >
+                          💰
+                        </button>
+                        <button 
                           onClick={() => handleOpenEditLore(item)}
                           className="bg-gray-800 text-gray-300 text-[10px] p-1 rounded font-bold hover:bg-gray-700"
                           title="Editar Nombre e Historia"
@@ -774,6 +815,13 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                         </div>
                         <div className="flex gap-1">
                           <button 
+                            onClick={() => handleOpenEditPrice(barbie)}
+                            className="bg-gray-800 text-yellow-400 text-[10px] p-1 rounded font-bold w-1/4 flex justify-center hover:bg-gray-700"
+                            title="Editar Precio"
+                          >
+                            💰
+                          </button>
+                          <button 
                             onClick={() => handleOpenEditLore(barbie)}
                             className="bg-gray-800 text-gray-300 text-[10px] p-1 rounded font-bold w-1/4 flex justify-center hover:bg-gray-700"
                             title="Editar Nombre e Historia"
@@ -789,9 +837,10 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                           </button>
                           <button 
                             onClick={() => setActiveModal({ type: 'add_to_vitrina', barbie })}
-                            className="bg-pink-600 text-white text-[10px] font-bold py-1 rounded w-2/4 hover:bg-pink-500"
+                            className="bg-pink-600 text-white text-[10px] font-bold py-1 rounded w-1/4 hover:bg-pink-500 flex justify-center"
+                            title="Añadir a Vitrina"
                           >
-                            + Añadir
+                            +
                           </button>
                         </div>
                       </div>
@@ -966,6 +1015,45 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
           </button>
         </div>
       </nav>
+
+      {/* MODAL: EDITAR PRECIO (💰) */}
+      {editingPriceItem && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-xs w-full">
+            <h3 className="text-sm font-bold text-pink-500 mb-1">Editar Precio Estimado</h3>
+            <p className="text-[10px] text-gray-400 mb-3">{editingPriceItem.name}</p>
+
+            <form onSubmit={handleSavePrice} className="space-y-3 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Precio Estimado (€):</label>
+                <input
+                  type="number"
+                  value={newPriceValue}
+                  onChange={(e) => setNewPriceValue(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5 text-xs focus:outline-none focus:border-pink-500"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEditingPriceItem(null)}
+                  className="bg-gray-800 text-gray-300 px-3 py-1.5 rounded font-bold text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="bg-pink-600 hover:bg-pink-500 text-white px-3 py-1.5 rounded font-bold text-xs"
+                >
+                  Guardar Precio
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: EDITAR HISTORIA / NOMBRE / LÍNEA */}
       {editingLoreItem && (
