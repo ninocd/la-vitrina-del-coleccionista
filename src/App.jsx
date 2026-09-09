@@ -10,13 +10,13 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
 
-// Componente de Silueta SVG de Barbie por defecto si no hay imagen
+// Componente de Silueta SVG de Barbie por defecto si no hay imagen (Evita Unsplash / fotos aleatorias)
 const BarbieSilhouetteFallback = () => (
   <div className="w-full h-full bg-gradient-to-b from-gray-900 to-pink-950 flex flex-col items-center justify-center p-4 rounded-lg border border-pink-900/30">
-    <svg className="w-24 h-24 text-pink-500/40 mb-2" viewBox="0 0 24 24" fill="currentColor">
+    <svg className="w-20 h-20 text-pink-500/40 mb-2" viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
     </svg>
-    <span className="text-[10px] text-pink-400 font-bold uppercase tracking-widest text-center">Imagen no disponible</span>
+    <span className="text-[10px] text-pink-400 font-bold uppercase tracking-widest text-center">Sin imagen cargada</span>
   </div>
 );
 
@@ -34,11 +34,18 @@ function calculateDynamicPrice(item) {
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('catalog'); // 'vitrina', 'scan', 'catalog', 'sales', 'community'
+  const [activeTab, setActiveTab] = useState('catalog');
 
   // Datos
   const [masterCatalog, setMasterCatalog] = useState([]);
   const [myCollection, setMyCollection] = useState([]);
+
+  // Perfiles de Probadores Beta
+  const betaTesters = [
+    { id: 1, name: "Eduardo C.", role: "Administrador & Lead Collector", pieces: 142, badge: "Master Curator", avatar: "👑" },
+    { id: 2, name: "Forteza S.", role: "Especialista Vintage & COA", pieces: 98, badge: "Vintage Expert", avatar: "📜" },
+    { id: 3, name: "Valeria M.", role: "Analista de Mercado & NFRB", pieces: 75, badge: "Market Analyst", avatar: "📈" }
+  ];
 
   // Filtros del Catálogo
   const [catalogSearchTerm, setCatalogSearchTerm] = useState('');
@@ -111,8 +118,12 @@ export default function App() {
           ? item.lore 
           : getBarbieLoreFallback(item.name, item.collection_line, item.release_year);
 
+        // Si la imagen es nula, vacía o apunta a unsplash, se deja en null para forzar la silueta
+        const validImage = (item.image_url && !item.image_url.includes('unsplash')) ? item.image_url : null;
+
         return { 
           ...item, 
+          image_url: validImage,
           estimated_min_price: estimatedPrice, 
           lore: loreText 
         };
@@ -139,7 +150,8 @@ export default function App() {
         setMyCollection(colData.map(item => ({
           ...item,
           userInstanceId: item.id,
-          lore: item.lore || getBarbieLoreFallback(item.name, item.collection_line, item.release_year)
+          lore: item.lore || getBarbieLoreFallback(item.name, item.collection_line, item.release_year),
+          image_url: (item.image_url && !item.image_url.includes('unsplash')) ? item.image_url : null
         })));
       }
     } catch (e) {
@@ -210,7 +222,7 @@ export default function App() {
     setEditingLoreItem(null);
   };
 
-  // 4. REGISTRAR EN MI VITRINA CON HISTORIA EDICIÓN INTEGRAL
+  // 4. REGISTRAR EN MI VITRINA
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie) return;
@@ -360,7 +372,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* BARRA DE MÉTRICAS FINANCIERAS DE LA COLECCIÓN */}
+      {/* BARRA DE MÉTRICAS FINANCIERAS */}
       <section className="bg-gradient-to-r from-gray-900 via-pink-950/40 to-gray-900 border-b border-pink-900/30 py-3">
         <div className="max-w-7xl mx-auto px-4 flex flex-wrap justify-around items-center gap-4 text-center">
           <div>
@@ -415,7 +427,7 @@ export default function App() {
             onClick={() => setActiveTab('community')}
             className={`px-4 py-2 rounded-xl font-bold text-sm transition ${activeTab === 'community' ? 'bg-pink-600 text-white shadow-lg shadow-pink-600/30' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
           >
-            👥 Coleccionistas
+            👥 Coleccionistas ({betaTesters.length})
           </button>
         </div>
       </nav>
@@ -453,7 +465,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* GRILLA DE TARJETAS DEL CATÁLOGO */}
+            {/* GRILLA DE TARJETAS */}
             {loading ? (
               <div className="text-center py-12 text-pink-400 font-bold animate-pulse">Cargando catálogo desde Supabase...</div>
             ) : (
@@ -631,7 +643,7 @@ export default function App() {
           </section>
         )}
 
-        {/* TAB: MARKETPLACE / VENTAS (VINTED, WALLAPOP, CATAWIKI, EBAY) */}
+        {/* TAB: MARKETPLACE / VENTAS */}
         {activeTab === 'sales' && (
           <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
             <h2 className="text-xl font-bold text-pink-500 mb-2">Generador de Anuncios y Gestión de Ventas</h2>
@@ -666,16 +678,26 @@ export default function App() {
           </section>
         )}
 
-        {/* TAB: COMUNIDAD DE COLECCIONISTAS */}
+        {/* TAB: COMUNIDAD DE COLECCIONISTAS & PROBADORES BETA */}
         {activeTab === 'community' && (
-          <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6 text-center">
-            <h2 className="text-xl font-bold text-pink-500 mb-2">Red de Coleccionistas de Barbie</h2>
-            <p className="text-xs text-gray-400 mb-6">Conéctate con otros coleccionistas, compara vitrinas e intercambia ediciones oficiales.</p>
+          <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+            <h2 className="text-xl font-bold text-pink-500 mb-2">Comunidad & Perfiles de Probadores Beta</h2>
+            <p className="text-xs text-gray-400 mb-6">Red de coleccionistas verificados y miembros del equipo de catalogación.</p>
             
-            <div className="max-w-md mx-auto bg-gray-950 p-6 rounded-xl border border-gray-800">
-              <span className="text-3xl">👑</span>
-              <h3 className="font-bold text-white mt-2">Comunidad Activa</h3>
-              <p className="text-xs text-gray-400 mt-1">Intercambio seguro de piezas NFRB, catálogos verificados y valoraciones oficiales.</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {betaTesters.map((tester) => (
+                <div key={tester.id} className="bg-gray-950 p-5 rounded-xl border border-gray-800 flex flex-col items-center text-center shadow-lg">
+                  <div className="w-16 h-16 bg-pink-950/80 border border-pink-500/40 rounded-full flex items-center justify-center text-3xl mb-3">
+                    {tester.avatar}
+                  </div>
+                  <h3 className="font-extrabold text-white text-base">{tester.name}</h3>
+                  <span className="mt-1 bg-pink-900/50 text-pink-300 text-[10px] font-bold px-2 py-0.5 rounded border border-pink-700/50">
+                    {tester.badge}
+                  </span>
+                  <p className="text-xs text-gray-400 mt-2">{tester.role}</p>
+                  <p className="text-xs text-pink-400 font-bold mt-3">{tester.pieces} muñecas catalogadas</p>
+                </div>
+              ))}
             </div>
           </section>
         )}
