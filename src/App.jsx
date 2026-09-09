@@ -79,9 +79,8 @@ export default function App() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // EFECTO PUERTAS DE VITRINA Y DETALLE 3D
+  // DETALLE Y VISTA DE VITRINA
   const [showVitrinaDoorsModal, setShowVitrinaDoorsModal] = useState(false);
-  const [doorsOpened, setDoorsOpened] = useState(false);
   const [selectedVitrinaDoll, setSelectedVitrinaDoll] = useState(null);
 
   // Perfiles de Coleccionistas Reales
@@ -218,12 +217,9 @@ export default function App() {
     });
   };
 
-  // ABRIR INSPECTOR DE PUERTAS DE VITRINA
-  const handleOpenVitrinaDoors = (barbie) => {
+  const handleOpenVitrinaDoll = (barbie) => {
     setSelectedVitrinaDoll(barbie);
-    setDoorsOpened(false);
     setShowVitrinaDoorsModal(true);
-    setTimeout(() => setDoorsOpened(true), 200);
   };
 
   const handleOpenEditLore = (barbie) => {
@@ -236,7 +232,7 @@ export default function App() {
     });
   };
 
-  // GUARDADO PERMANENTE DEL NOMBRE, LÍNEA, AÑO Y LORE
+  // GUARDADO PERMANENTE DE NOMBRE, LÍNEA, AÑO Y LORE
   const handleSaveAdminLore = async (e) => {
     e.preventDefault();
     if (!editingLoreItem) return;
@@ -288,6 +284,7 @@ export default function App() {
     const payload = {
       user_id: session?.user?.id || 'default-user',
       barbie_id: barbieSource.id || null,
+      name: barbieSource.name,
       quantity: Math.max(1, Number(userBarbieForm.quantity || 1)),
       condition: userBarbieForm.condition ? userBarbieForm.condition.split(' ')[0] : 'NIB'
     };
@@ -494,9 +491,9 @@ export default function App() {
                 {myCollection.map((item) => (
                   <div key={item.userInstanceId || item.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between">
                     <div>
-                      {/* ÁREA PULSABLE PARA ABRIR VITRINA */}
+                      {/* CUALQUIER CLIC EN LA FOTO ABRE EL DETALLE */}
                       <div 
-                        onClick={() => handleOpenVitrinaDoors(item)}
+                        onClick={() => handleOpenVitrinaDoll(item)}
                         className="h-40 bg-gray-950 p-2 flex items-center justify-center relative cursor-pointer group"
                       >
                         {item.image_url ? (
@@ -507,20 +504,19 @@ export default function App() {
                         <span className="absolute top-1.5 left-1.5 bg-gray-900/90 text-gray-300 text-[8px] px-1.5 py-0.5 rounded font-bold">
                           {item.condition || 'NIB'}
                         </span>
-                        <span className="absolute bottom-1 right-1 bg-pink-950/80 border border-pink-500/40 text-pink-300 text-[8px] px-1.5 py-0.5 rounded font-bold">
-                          🚪 Abrir Vitrina
-                        </span>
                       </div>
+
+                      {/* CUALQUIER CLIC EN NOMBRE O LORE ABRE EL DETALLE */}
                       <div className="p-2.5">
                         <p className="text-[9px] text-pink-400 font-bold uppercase truncate">{item.collection_line}</p>
                         <h3 
-                          onClick={() => handleOpenVitrinaDoors(item)}
+                          onClick={() => handleOpenVitrinaDoll(item)}
                           className="font-bold text-xs text-white leading-tight line-clamp-1 cursor-pointer hover:text-pink-400 transition"
                         >
                           {item.name}
                         </h3>
                         <p 
-                          onClick={() => handleOpenVitrinaDoors(item)}
+                          onClick={() => handleOpenVitrinaDoll(item)}
                           className="text-[10px] text-gray-400 mt-1 line-clamp-2 cursor-pointer hover:text-gray-200"
                         >
                           {item.lore}
@@ -762,10 +758,10 @@ export default function App() {
 
       </main>
 
-      {/* MODAL 3D: PUERTAS DE LA VITRINA Y MUESTRARIO */}
+      {/* MODAL DETALLE MUÑECA */}
       {showVitrinaDoorsModal && selectedVitrinaDoll && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-sm bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 border-4 border-pink-900/60 rounded-2xl overflow-hidden shadow-2xl p-4">
+          <div className="relative w-full max-w-sm bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 border-2 border-pink-900/60 rounded-2xl overflow-hidden shadow-2xl p-4">
             
             <button 
               onClick={() => setShowVitrinaDoorsModal(false)}
@@ -774,51 +770,18 @@ export default function App() {
               ✕
             </button>
 
-            {/* CONTENEDOR 3D CON PERSPECTIVA Y PUERTAS DE CRISTAL */}
-            <div 
-              className="relative w-full h-80 bg-gradient-to-b from-pink-950/30 to-black rounded-xl overflow-hidden border border-pink-500/30 flex items-center justify-center mb-4"
-              style={{ perspective: '1000px' }}
-            >
-              
-              {/* LUZ DE FOCO DE VITRINA */}
-              <div className="absolute top-0 w-32 h-32 bg-pink-500/20 rounded-full blur-2xl pointer-events-none"></div>
-
-              {/* IMAGEN DE LA MUÑECA DENTRO DE LA VITRINA */}
-              <div className="z-10 h-64 p-2 flex items-center justify-center">
+            {/* CONTENEDOR VISTA AMPLIADA */}
+            <div className="relative w-full h-72 bg-gradient-to-b from-pink-950/30 to-black rounded-xl overflow-hidden border border-pink-500/30 flex items-center justify-center mb-4">
+              <div className="z-10 h-60 p-2 flex items-center justify-center">
                 {selectedVitrinaDoll.image_url ? (
                   <img src={selectedVitrinaDoll.image_url} alt={selectedVitrinaDoll.name} className="max-h-full object-contain filter drop-shadow-[0_10px_10px_rgba(236,72,153,0.3)]" />
                 ) : (
                   <BarbieSilhouetteFallback />
                 )}
               </div>
-
-              {/* ESTANTE DE CRISTAL ILUMINADO */}
-              <div className="absolute bottom-4 w-4/5 h-2 bg-gradient-to-r from-transparent via-pink-400/40 to-transparent rounded-full blur-[1px]"></div>
-
-              {/* PUERTA IZQUIERDA DE CRISTAL TEMPLADO (ABRE HACIA FUERA EN 3D) */}
-              <div 
-                className="absolute top-0 left-0 w-1/2 h-full bg-pink-500/10 border-r border-white/30 backdrop-blur-[2px] transition-transform duration-1000 ease-in-out origin-left flex items-center justify-end pr-2 pointer-events-none z-20"
-                style={{ 
-                  transform: doorsOpened ? 'rotateY(-110deg)' : 'rotateY(0deg)',
-                  transformStyle: 'preserve-3d'
-                }}
-              >
-                <div className="w-1.5 h-12 bg-white/40 rounded-full shadow-md"></div>
-              </div>
-
-              {/* PUERTA DERECHA DE CRISTAL TEMPLADO (ABRE HACIA FUERA EN 3D) */}
-              <div 
-                className="absolute top-0 right-0 w-1/2 h-full bg-pink-500/10 border-l border-white/30 backdrop-blur-[2px] transition-transform duration-1000 ease-in-out origin-right flex items-center justify-start pl-2 pointer-events-none z-20"
-                style={{ 
-                  transform: doorsOpened ? 'rotateY(110deg)' : 'rotateY(0deg)',
-                  transformStyle: 'preserve-3d'
-                }}
-              >
-                <div className="w-1.5 h-12 bg-white/40 rounded-full shadow-md"></div>
-              </div>
             </div>
 
-            {/* INFORMACIÓN Y HISTORIA DE LA MUÑECA */}
+            {/* INFORMACIÓN Y HISTORIA */}
             <div className="text-left bg-gray-950/80 p-3 rounded-xl border border-pink-900/40">
               <span className="text-[9px] text-pink-400 font-extrabold uppercase tracking-widest">{selectedVitrinaDoll.collection_line} ({selectedVitrinaDoll.release_year})</span>
               <h3 className="text-base font-black text-white mt-0.5 leading-snug">{selectedVitrinaDoll.name}</h3>
