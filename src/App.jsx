@@ -258,33 +258,38 @@ export default function App() {
     setMyCollection(prev => prev.filter(item => item.userInstanceId !== userInstanceId));
   };
 
-  // ELIMINAR DEL CATÁLOGO MAESTRO (BORRADO CORREGIDO EN CASCADA)
+  // ELIMINAR DEL CATÁLOGO MAESTRO (CON BORRADO FORZADO Y LIMPIEZA DE ESTADO)
   const handleDeleteFromCatalog = async (masterId) => {
-    if (!window.confirm("¿Seguro que deseas borrar esta Barbie del Catálogo Maestro? También se quitará de la vitrina si estaba agregada.")) return;
+    if (!window.confirm("¿Seguro que deseas borrar esta Barbie del Catálogo Maestro?")) return;
+
+    // Actualización reactiva inmediata en la interfaz
+    setMasterCatalog(prev => prev.filter(item => item.id !== masterId));
+    setMyCollection(prev => prev.filter(item => item.barbie_id !== masterId));
 
     if (supabase) {
-      // 1. Limpiar referencias en user_collection
-      const { error: colErr } = await supabase
-        .from('user_collection')
-        .delete()
-        .eq('barbie_id', masterId);
+      try {
+        // 1. Borrar de user_collection por clave foránea
+        await supabase
+          .from('user_collection')
+          .delete()
+          .eq('barbie_id', masterId);
 
-      if (colErr) console.error("Aviso al limpiar user_collection:", colErr);
+        // 2. Borrar de barbies_master
+        const { error: masterErr } = await supabase
+          .from('barbies_master')
+          .delete()
+          .eq('id', masterId);
 
-      // 2. Eliminar de barbies_master
-      const { error: masterErr } = await supabase
-        .from('barbies_master')
-        .delete()
-        .eq('id', masterId);
-
-      if (masterErr) {
-        console.error("Error al eliminar de barbies_master:", masterErr);
-        alert(`No se pudo eliminar del catálogo maestro: ${masterErr.message}`);
-        return;
+        if (masterErr) {
+          console.error("Error directo de Supabase RLS/Constraint:", masterErr);
+          alert(`Aviso de Supabase: ${masterErr.message}. Verifica que RLS permita la acción DELETE en barbies_master.`);
+          await fetchData(); // Si falla en servidor, se revierte la UI
+        }
+      } catch (err) {
+        console.error("Excepción en borrado:", err);
+        await fetchData();
       }
     }
-
-    await fetchData();
   };
 
   // GUARDA DIRECTAMENTE EN EL CATÁLOGO MAESTRO (barbies_master) DESDE EL ESCÁNER
@@ -321,7 +326,7 @@ export default function App() {
     setActiveTab('catalog');
   };
 
-  // AÑADIR A MI VITRINA (CORREGIDO: SE ELIMINÓ EL CAMPO 'name' INEXISTENTE EN user_collection)
+  // AÑADIR A MI VITRINA
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie) return;
@@ -330,7 +335,6 @@ export default function App() {
     const condClean = userBarbieForm.condition ? userBarbieForm.condition.split(' ')[0] : 'NIB';
 
     if (supabase) {
-      // PAYLOAD ESTRICTO SEGÚN EL ESQUEMA DE user_collection (SIN COLUMNA 'name')
       const payload = {
         user_id: session?.user?.id || 'default-user',
         barbie_id: barbieSource.id,
@@ -608,7 +612,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                       </div>
                     </div>
                     
-                    {/* BOTONES DE ACCIÓN EN VITRINA (INCLUYE ELIMINAR) */}
+                    {/* BOTONES DE ACCIÓN EN VITRINA */}
                     <div className="p-2 border-t border-gray-800 bg-gray-950 flex items-center justify-between">
                       <span className="text-pink-400 font-extrabold text-xs">{item.estimated_min_price} €</span>
                       <div className="flex gap-1">
