@@ -149,12 +149,12 @@ export default function App() {
             ...matchedMaster,
             ...item,
             userInstanceId: item.id,
-            name: item.name || matchedMaster.name || 'Barbie Colección',
-            collection_line: item.collection_line || matchedMaster.collection_line || 'Mattel',
-            release_year: item.release_year || matchedMaster.release_year || 2000,
-            estimated_min_price: item.estimated_min_price || matchedMaster.estimated_min_price || 35,
-            lore: item.lore || matchedMaster.lore || getBarbieLoreFallback(item.name, item.collection_line, item.release_year),
-            image_url: item.image_url || matchedMaster.image_url || null,
+            name: matchedMaster.name || item.name || 'Barbie Colección',
+            collection_line: matchedMaster.collection_line || item.collection_line || 'Mattel',
+            release_year: matchedMaster.release_year || item.release_year || 2000,
+            estimated_min_price: matchedMaster.estimated_min_price || item.estimated_min_price || 35,
+            lore: matchedMaster.lore || item.lore || getBarbieLoreFallback(matchedMaster.name, matchedMaster.collection_line, matchedMaster.release_year),
+            image_url: matchedMaster.image_url || item.image_url || null,
             condition: item.condition || 'NIB'
           };
         });
@@ -218,21 +218,8 @@ export default function App() {
     const updatedLine = adminLoreForm.collection_line;
     const updatedYear = Number(adminLoreForm.release_year);
 
-    if (editingLoreItem.userInstanceId && supabase) {
-      const { error: userErr } = await supabase
-        .from('user_collection')
-        .update({ 
-          name: updatedName,
-          lore: updatedLore, 
-          collection_line: updatedLine, 
-          release_year: updatedYear
-        })
-        .eq('id', editingLoreItem.userInstanceId);
-
-      if (userErr) console.error("Error al actualizar user_collection:", userErr);
-    }
-
     const masterId = editingLoreItem.barbie_id || editingLoreItem.barbie_master_id || editingLoreItem.id;
+
     if (masterId && supabase) {
       const { error: masterErr } = await supabase
         .from('barbies_master')
@@ -261,23 +248,40 @@ export default function App() {
         .delete()
         .eq('id', userInstanceId);
 
-      if (error) console.error("Error al eliminar de user_collection:", error);
+      if (error) {
+        console.error("Error al eliminar de user_collection:", error);
+        alert(`Error al eliminar: ${error.message}`);
+        return;
+      }
     }
 
     setMyCollection(prev => prev.filter(item => item.userInstanceId !== userInstanceId));
   };
 
-  // ELIMINAR DEL CATÁLOGO MAESTRO
+  // ELIMINAR DEL CATÁLOGO MAESTRO (BORRADO CORREGIDO EN CASCADA)
   const handleDeleteFromCatalog = async (masterId) => {
-    if (!window.confirm("¿Seguro que deseas borrar esta Barbie del Catálogo Maestro?")) return;
+    if (!window.confirm("¿Seguro que deseas borrar esta Barbie del Catálogo Maestro? También se quitará de la vitrina si estaba agregada.")) return;
 
     if (supabase) {
-      // 1. Eliminar referencias en user_collection primero para evitar errores de clave foránea
-      await supabase.from('user_collection').delete().eq('barbie_id', masterId);
+      // 1. Limpiar referencias en user_collection
+      const { error: colErr } = await supabase
+        .from('user_collection')
+        .delete()
+        .eq('barbie_id', masterId);
+
+      if (colErr) console.error("Aviso al limpiar user_collection:", colErr);
 
       // 2. Eliminar de barbies_master
-      const { error } = await supabase.from('barbies_master').delete().eq('id', masterId);
-      if (error) console.error("Error al eliminar de barbies_master:", error);
+      const { error: masterErr } = await supabase
+        .from('barbies_master')
+        .delete()
+        .eq('id', masterId);
+
+      if (masterErr) {
+        console.error("Error al eliminar de barbies_master:", masterErr);
+        alert(`No se pudo eliminar del catálogo maestro: ${masterErr.message}`);
+        return;
+      }
     }
 
     await fetchData();
@@ -317,7 +321,7 @@ export default function App() {
     setActiveTab('catalog');
   };
 
-  // AÑADIR A MI VITRINA DESDE EL CATÁLOGO MAESTRO (CORREGIDO)
+  // AÑADIR A MI VITRINA (CORREGIDO: SE ELIMINÓ EL CAMPO 'name' INEXISTENTE EN user_collection)
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie) return;
@@ -326,10 +330,10 @@ export default function App() {
     const condClean = userBarbieForm.condition ? userBarbieForm.condition.split(' ')[0] : 'NIB';
 
     if (supabase) {
+      // PAYLOAD ESTRICTO SEGÚN EL ESQUEMA DE user_collection (SIN COLUMNA 'name')
       const payload = {
         user_id: session?.user?.id || 'default-user',
         barbie_id: barbieSource.id,
-        name: barbieSource.name,
         quantity: Math.max(1, Number(userBarbieForm.quantity || 1)),
         condition: condClean
       };
@@ -339,6 +343,7 @@ export default function App() {
       if (error) {
         console.error("Error al insertar en user_collection:", error);
         alert(`No se pudo añadir a la vitrina: ${error.message}`);
+        return;
       } else {
         await fetchData();
       }
@@ -752,7 +757,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                         </div>
                       </div>
 
-                      {/* CONTROLES DEL CATÁLOGO MAESTRO (AÑADIR, EDITAR Y ELIMINAR DUPLICADOS) */}
+                      {/* CONTROLES DEL CATÁLOGO MAESTRO */}
                       <div className="p-2 border-t border-gray-800/80 bg-gray-950 flex flex-col gap-1.5">
                         <div className="flex justify-between items-center">
                           <span className="text-pink-400 font-extrabold text-xs">{barbie.estimated_min_price} €</span>
