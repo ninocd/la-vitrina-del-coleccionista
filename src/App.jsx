@@ -10,7 +10,7 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
 
-// Silueta vectorial elegante
+// Silueta vectorial por defecto si no hay imagen
 const BarbieSilhouetteFallback = () => (
   <div className="w-full h-full bg-gradient-to-b from-gray-900 to-pink-950 flex flex-col items-center justify-center p-2 rounded-lg border border-pink-900/30">
     <svg className="w-12 h-12 text-pink-500/40 mb-1" viewBox="0 0 24 24" fill="currentColor">
@@ -67,20 +67,20 @@ function calculateDynamicPrice(item) {
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('vitrina'); // Pestaña principal al abrir
+  const [activeTab, setActiveTab] = useState('vitrina');
 
   // Datos
   const [masterCatalog, setMasterCatalog] = useState([]);
   const [myCollection, setMyCollection] = useState([]);
   const [wishlist, setWishlist] = useState([]);
 
-  // Estados de interfaz móvil
+  // Interfaz
   const [showMobileMetrics, setShowMobileMetrics] = useState(false);
   const [isVitrinaPublic, setIsVitrinaPublic] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Perfiles Reales de Coleccionistas
+  // Perfiles de Coleccionistas Reales
   const betaTesters = [
     { id: 1, handle: "@chicledefresadolls", role: "Especialista en Fotografía & Curaduría", badge: "Verified Collector", avatar: "🎀" },
     { id: 2, handle: "@barbiedecoleccionenespanol", role: "Historiador de Lore & Ediciones Vintage", badge: "Vintage Archivist", avatar: "👑" },
@@ -91,7 +91,7 @@ export default function App() {
   const [catalogSearchTerm, setCatalogSearchTerm] = useState('');
   const [selectedEraFilter, setSelectedEraFilter] = useState('Todas');
 
-  // Modales
+  // Modales y Form
   const [editingLoreItem, setEditingLoreItem] = useState(null);
   const [certificateItem, setCertificateItem] = useState(null);
   const [comparePriceItem, setComparePriceItem] = useState(null);
@@ -136,6 +136,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Cargar Catálogo Maestro
   async function fetchMasterCatalog() {
     setLoading(true);
     try {
@@ -146,7 +147,10 @@ export default function App() {
         .select('*')
         .order('release_year', { ascending: true });
 
-      if (error) return;
+      if (error) {
+        console.error("Error cargando barbies_master:", error);
+        return;
+      }
 
       const catalog = (data || []).map((item) => {
         const estimatedPrice = calculateDynamicPrice(item);
@@ -172,6 +176,7 @@ export default function App() {
     }
   }
 
+  // Cargar Vitrina del Usuario
   async function fetchUserData(userId) {
     if (!supabase) return;
     try {
@@ -216,6 +221,7 @@ export default function App() {
     });
   };
 
+  // GUARDADO PERMANENTE Y CORREGIDO EN SUPABASE
   const handleSaveAdminLore = async (e) => {
     e.preventDefault();
     if (!editingLoreItem) return;
@@ -224,16 +230,19 @@ export default function App() {
     const updatedLine = adminLoreForm.collection_line;
     const updatedYear = Number(adminLoreForm.release_year);
 
-    if (supabase && editingLoreItem.userInstanceId) {
-      await supabase
+    // 1. Guardar en la vitrina del usuario (si la pieza viene de user_collections)
+    if (editingLoreItem.userInstanceId && supabase) {
+      const { error: userErr } = await supabase
         .from('user_collections')
         .update({ 
           lore: updatedLore, 
-          notes: `[HISTORIA OFICIAL]: ${updatedLore}`, 
           collection_line: updatedLine, 
-          release_year: updatedYear 
+          release_year: updatedYear,
+          notes: `[HISTORIA OFICIAL]: ${updatedLore}` 
         })
         .eq('id', editingLoreItem.userInstanceId);
+
+      if (userErr) console.error("Error al actualizar user_collections:", userErr);
 
       setMyCollection(prev => prev.map(item => 
         item.userInstanceId === editingLoreItem.userInstanceId 
@@ -242,18 +251,22 @@ export default function App() {
       ));
     }
 
-    if (supabase && editingLoreItem.id) {
-      await supabase
+    // 2. Guardar en el catálogo maestro (barbies_master)
+    const masterId = editingLoreItem.barbie_master_id || editingLoreItem.id;
+    if (masterId && supabase) {
+      const { error: masterErr } = await supabase
         .from('barbies_master')
         .update({ 
           lore: updatedLore, 
           collection_line: updatedLine, 
           release_year: updatedYear 
         })
-        .eq('id', editingLoreItem.id);
+        .eq('id', masterId);
+
+      if (masterErr) console.error("Error al actualizar barbies_master:", masterErr);
 
       setMasterCatalog(prev => prev.map(item => 
-        item.id === editingLoreItem.id 
+        item.id === masterId 
           ? { ...item, lore: updatedLore, collection_line: updatedLine, release_year: updatedYear }
           : item
       ));
@@ -421,7 +434,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 font-sans pb-24 pt-2">
       
-      {/* CABECERA COMPACTA MÓVIL */}
+      {/* CABECERA MÓVIL */}
       <header className="bg-gray-900/90 border-b border-pink-900/40 px-3 py-2 sticky top-0 z-40 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -472,7 +485,7 @@ export default function App() {
         )}
       </header>
 
-      {/* CONTENIDO PRINCIPAL SEGÚN PESTAÑA SELECCIONADA */}
+      {/* VISTA PRINCIPAL */}
       <main className="max-w-7xl mx-auto px-3 mt-3">
 
         {/* TAB: MI VITRINA */}
@@ -510,6 +523,7 @@ export default function App() {
                       <div className="p-2.5">
                         <p className="text-[9px] text-pink-400 font-bold uppercase truncate">{item.collection_line}</p>
                         <h3 className="font-bold text-xs text-white leading-tight line-clamp-1">{item.name}</h3>
+                        <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{item.lore}</p>
                       </div>
                     </div>
                     <div className="p-2 border-t border-gray-800 bg-gray-950 flex items-center justify-between">
@@ -525,7 +539,7 @@ export default function App() {
                         <button 
                           onClick={() => handleOpenEditLore(item)}
                           className="bg-gray-800 text-gray-300 text-[10px] p-1 rounded font-bold"
-                          title="Editar"
+                          title="Editar Historia"
                         >
                           ✏️
                         </button>
@@ -538,7 +552,7 @@ export default function App() {
           </section>
         )}
 
-        {/* TAB: ESCÁNER CON CÁMARA */}
+        {/* TAB: ESCÁNER */}
         {activeTab === 'scan' && (
           <section className="max-w-md mx-auto bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl">
             <h2 className="text-base font-extrabold text-pink-500 text-center mb-1">Escáner de Catalogación IA</h2>
@@ -605,7 +619,6 @@ export default function App() {
         {/* TAB: CATÁLOGO MAESTRO */}
         {activeTab === 'catalog' && (
           <section>
-            {/* BUSCADOR MÓVIL Y FILTROS */}
             <div className="bg-gray-900 p-2.5 rounded-xl mb-3 border border-pink-900/40 flex flex-col gap-2">
               <input
                 type="text"
@@ -658,6 +671,7 @@ export default function App() {
                         <div className="p-2">
                           <p className="text-[9px] text-pink-400 font-bold uppercase truncate">{barbie.collection_line}</p>
                           <h3 className="font-bold text-xs text-white leading-tight line-clamp-1">{barbie.name}</h3>
+                          <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{barbie.lore}</p>
                         </div>
                       </div>
 
@@ -675,6 +689,7 @@ export default function App() {
                           <button 
                             onClick={() => handleOpenEditLore(barbie)}
                             className="bg-gray-800 text-gray-300 text-[10px] p-1 rounded font-bold w-1/3 flex justify-center"
+                            title="Editar Historia"
                           >
                             ✏️
                           </button>
@@ -694,7 +709,7 @@ export default function App() {
           </section>
         )}
 
-        {/* TAB: MARKETPLACE / VENTAS */}
+        {/* TAB: MARKETPLACE */}
         {activeTab === 'sales' && (
           <section className="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <h2 className="text-base font-bold text-pink-500 mb-1">Anuncios de Venta</h2>
@@ -746,7 +761,7 @@ export default function App() {
 
       </main>
 
-      {/* BARRA DE NAVEGACIÓN INFERIOR FIJA (ESTILO APP NATIVA MÓVIL) */}
+      {/* NAVEGACIÓN INFERIOR FIJA */}
       <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 border-t border-gray-800 z-50 backdrop-blur-lg px-2 py-1.5">
         <div className="max-w-md mx-auto flex justify-around items-center">
           <button 
@@ -787,6 +802,64 @@ export default function App() {
         </div>
       </nav>
 
+      {/* MODAL: EDITAR HISTORIA / LORE (ADMIN) */}
+      {editingLoreItem && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-sm w-full">
+            <h3 className="text-sm font-bold text-pink-500 mb-1">Editar Historia de Barbie</h3>
+            <p className="text-[10px] text-gray-400 mb-3">{editingLoreItem.name}</p>
+
+            <form onSubmit={handleSaveAdminLore} className="space-y-3 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Línea de Colección:</label>
+                <input
+                  type="text"
+                  value={adminLoreForm.collection_line}
+                  onChange={(e) => setAdminLoreForm({ ...adminLoreForm, collection_line: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Año de Lanzamiento:</label>
+                <input
+                  type="number"
+                  value={adminLoreForm.release_year}
+                  onChange={(e) => setAdminLoreForm({ ...adminLoreForm, release_year: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5 text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Historia / Lore Permanente:</label>
+                <textarea
+                  rows="5"
+                  value={adminLoreForm.lore}
+                  onChange={(e) => setAdminLoreForm({ ...adminLoreForm, lore: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5 text-xs focus:outline-none focus:border-pink-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEditingLoreItem(null)}
+                  className="bg-gray-800 text-gray-300 px-3 py-1.5 rounded font-bold text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="bg-pink-600 hover:bg-pink-500 text-white px-3 py-1.5 rounded font-bold text-xs"
+                >
+                  Guardar Permanente
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: PRECIOS MULTISITIO */}
       {comparePriceItem && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -807,7 +880,7 @@ export default function App() {
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-between bg-gray-950 p-2 rounded border border-gray-800 text-[11px] font-bold text-white uppercase"
+                  className="flex items-center justify-between bg-gray-950 p-2 rounded border border-gray-800 text-[11px] font-bold text-white uppercase hover:border-pink-500/50"
                 >
                   <span>{platform}</span>
                   <span className="text-pink-400">Buscar ➔</span>
@@ -829,7 +902,7 @@ export default function App() {
               ✕
             </button>
             <h3 className="text-sm font-bold text-pink-500 mb-1">Compartir Vitrina</h3>
-            <p className="text-[11px] text-gray-400 mb-3">Publica tu colección en tus redes.</p>
+            <p className="text-[11px] text-gray-400 mb-3">Publica tu colección en redes sociales.</p>
 
             <div className="space-y-2 text-xs">
               <a
@@ -859,63 +932,6 @@ export default function App() {
                 {copiedLink ? '¡Enlace Copiado!' : 'Copiar Enlace Directo'}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: EDITAR HISTORIA ADMIN */}
-      {editingLoreItem && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-sm w-full">
-            <h3 className="text-sm font-bold text-pink-500 mb-2">Editar Lore (Admin)</h3>
-
-            <form onSubmit={handleSaveAdminLore} className="space-y-3 text-xs">
-              <div>
-                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Línea:</label>
-                <input
-                  type="text"
-                  value={adminLoreForm.collection_line}
-                  onChange={(e) => setAdminLoreForm({ ...adminLoreForm, collection_line: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Año:</label>
-                <input
-                  type="number"
-                  value={adminLoreForm.release_year}
-                  onChange={(e) => setAdminLoreForm({ ...adminLoreForm, release_year: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Lore:</label>
-                <textarea
-                  rows="4"
-                  value={adminLoreForm.lore}
-                  onChange={(e) => setAdminLoreForm({ ...adminLoreForm, lore: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setEditingLoreItem(null)}
-                  className="bg-gray-800 text-gray-300 px-3 py-1.5 rounded font-bold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="bg-pink-600 text-white px-3 py-1.5 rounded font-bold"
-                >
-                  Guardar
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
