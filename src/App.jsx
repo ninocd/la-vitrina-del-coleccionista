@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// 1. Configuración limpia de Supabase
+// 1. Limpieza de URLs para Supabase
 const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseUrl = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -10,7 +10,7 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
 
-// Silueta vectorial elegante por defecto
+// Silueta vectorial elegante por defecto (evita fotos aleatorias)
 const BarbieSilhouetteFallback = () => (
   <div className="w-full h-full bg-gradient-to-b from-gray-900 to-pink-950 flex flex-col items-center justify-center p-4 rounded-lg border border-pink-900/30">
     <svg className="w-20 h-20 text-pink-500/40 mb-2" viewBox="0 0 24 24" fill="currentColor">
@@ -20,7 +20,7 @@ const BarbieSilhouetteFallback = () => (
   </div>
 );
 
-// Procesador gráfico: Recorta y aplica fondo y base blanco tipo estudio
+// Procesador de imagen: Limpia fondo y añade base blanca estilo estudio profesional
 const processWhiteStudioBackground = (base64Img) => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -32,11 +32,11 @@ const processWhiteStudioBackground = (base64Img) => {
       canvas.height = img.height || 800;
       const ctx = canvas.getContext('2d');
 
-      // Fondo blanco limpio
+      // Fondo blanco estricto
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Sombra de pedestal / base suave
+      // Base / sombra de vitrina
       const gradient = ctx.createRadialGradient(
         canvas.width / 2, canvas.height * 0.85, 10,
         canvas.width / 2, canvas.height * 0.85, canvas.width * 0.4
@@ -48,7 +48,7 @@ const processWhiteStudioBackground = (base64Img) => {
       ctx.ellipse(canvas.width / 2, canvas.height * 0.85, canvas.width * 0.35, canvas.height * 0.05, 0, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Render de la muñeca
+      // Dibujar imagen capturada
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       resolve(canvas.toDataURL('image/jpeg', 0.9));
     };
@@ -72,7 +72,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('catalog');
 
-  // Datos de colecciones
+  // Datos
   const [masterCatalog, setMasterCatalog] = useState([]);
   const [myCollection, setMyCollection] = useState([]);
   const [wishlist, setWishlist] = useState([]);
@@ -197,7 +197,7 @@ export default function App() {
     return acc + (price * qty);
   }, 0);
 
-  // Alternar Wishlist
+  // Alternar Lista de Deseos
   const toggleWishlist = (barbie) => {
     setWishlist(prev => {
       const exists = prev.some(item => item.id === barbie.id);
@@ -206,7 +206,7 @@ export default function App() {
     });
   };
 
-  // Guardado permanente de Lore Admin
+  // Guardar Lore Admin
   const handleOpenEditLore = (barbie) => {
     setEditingLoreItem(barbie);
     setAdminLoreForm({
@@ -262,7 +262,7 @@ export default function App() {
     setEditingLoreItem(null);
   };
 
-  // Guardar en Mi Vitrina (Procesa Fondo/Base Blanco)
+  // Guardar en Mi Vitrina (Con procesado de fondo blanco)
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie) return;
@@ -278,7 +278,6 @@ export default function App() {
       finalPriceInEUR = currency === 'USD' ? parsedCustom / exchangeRateUSD : parsedCustom;
     }
 
-    // Procesa imagen con fondo e iluminación de estudio si proviene de escáner
     let processedImage = barbieSource.image_url || null;
     if (processedImage && processedImage.startsWith('data:image')) {
       processedImage = await processWhiteStudioBackground(processedImage);
@@ -377,7 +376,7 @@ export default function App() {
     }
   };
 
-  // Enlaces de Búsqueda de Precios Multisitio
+  // Enlaces directos a marketplaces
   const getMarketSearchUrls = (barbieName) => {
     const query = encodeURIComponent(`Barbie ${barbieName}`);
     return {
@@ -389,7 +388,7 @@ export default function App() {
     };
   };
 
-  // Filtrado
+  // Filtros de búsqueda
   const filteredMasterCatalog = masterCatalog.filter((barbie) => {
     const nameMatch = (barbie.name || '').toLowerCase().includes(catalogSearchTerm.toLowerCase());
     const lineMatch = (barbie.collection_line || '').toLowerCase().includes(catalogSearchTerm.toLowerCase());
@@ -451,7 +450,7 @@ export default function App() {
           </div>
           <div className="hidden sm:block border-r border-gray-800 h-8"></div>
           <div>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Wishlist (Deseos)</p>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Wishlist (Lista de Deseos)</p>
             <p className="text-xl font-black text-pink-300">{wishlist.length} piezas</p>
           </div>
         </div>
@@ -495,7 +494,7 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto px-4 mt-6">
 
-        {/* TAB: CATÁLOGO MAESTRO CON WISHLIST Y BUSCADOR DE PRECIOS */}
+        {/* TAB: CATÁLOGO MAESTRO CON BOTÓN DE WISHLIST Y BUSCADOR MULTISITIO */}
         {activeTab === 'catalog' && (
           <section>
             <div className="bg-gray-900 p-4 rounded-xl mb-6 border border-pink-900/40 flex flex-col md:flex-row gap-4 justify-between items-center shadow-lg">
@@ -542,7 +541,8 @@ export default function App() {
                           <span className="absolute top-3 right-3 bg-pink-950/80 border border-pink-500/40 text-pink-300 text-xs px-2 py-1 rounded-md font-bold">
                             {barbie.release_year}
                           </span>
-                          {/* BOTÓN WISHLIST */}
+                          
+                          {/* BOTÓN FLOTANTE WISHLIST */}
                           <button 
                             onClick={() => toggleWishlist(barbie)}
                             className={`absolute top-3 left-3 p-2 rounded-full border transition ${isWishlisted ? 'bg-pink-600 border-pink-400 text-white' : 'bg-gray-900/80 border-gray-700 text-gray-400 hover:text-pink-400'}`}
@@ -566,7 +566,20 @@ export default function App() {
                               {currency === 'EUR' ? `${barbie.estimated_min_price} €` : `${Math.round(barbie.estimated_min_price * exchangeRateUSD)} $`}
                             </p>
                           </div>
-                          <div className="flex gap-1">
+                          
+                          {/* ACCIONES DE TARJETA CON BOTÓN VISIBLE DE WISHLIST */}
+                          <div className="flex gap-1 items-center flex-wrap justify-end">
+                            <button 
+                              onClick={() => toggleWishlist(barbie)}
+                              className={`text-xs px-2 py-1.5 rounded-lg font-bold border transition ${
+                                isWishlisted 
+                                  ? 'bg-pink-600 border-pink-500 text-white' 
+                                  : 'bg-gray-800 border-gray-700 text-pink-400 hover:bg-gray-700'
+                              }`}
+                              title={isWishlisted ? "Quitar de Deseos" : "Añadir a Deseos"}
+                            >
+                              {isWishlisted ? '💖 En Wishlist' : '🤍 Wishlist'}
+                            </button>
                             <button 
                               onClick={() => setComparePriceItem(barbie)}
                               className="bg-gray-800 hover:bg-gray-700 text-xs px-2 py-1.5 rounded-lg text-pink-300 font-bold transition"
@@ -598,7 +611,7 @@ export default function App() {
           </section>
         )}
 
-        {/* TAB: ESCÁNER CON GUARDADO DIRECTO */}
+        {/* TAB: ESCÁNER CON GUARDADO DIRECTO EN MI VITRINA */}
         {activeTab === 'scan' && (
           <section className="max-w-2xl mx-auto bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-2xl">
             <h2 className="text-xl font-extrabold text-pink-500 text-center mb-2">Escáner de Catalogación IA</h2>
@@ -781,7 +794,7 @@ export default function App() {
 
       </main>
 
-      {/* MODAL: BUSCADOR DE PRECIOS MULTISITIO (VINTED, WALLAPOP, EBAY, AMAZON, CATAWIKI) */}
+      {/* MODAL: BUSCADOR DE PRECIOS MULTISITIO */}
       {comparePriceItem && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl relative">
