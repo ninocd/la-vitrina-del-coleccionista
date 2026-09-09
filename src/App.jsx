@@ -76,9 +76,13 @@ export default function App() {
 
   // Interfaz móvil / pública
   const [showMobileMetrics, setShowMobileMetrics] = useState(false);
-  const [isVitrinaPublic, setIsVitrinaPublic] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // EFECTO PUERTAS DE VITRINA Y DETALLE 3D
+  const [showVitrinaDoorsModal, setShowVitrinaDoorsModal] = useState(false);
+  const [doorsOpened, setDoorsOpened] = useState(false);
+  const [selectedVitrinaDoll, setSelectedVitrinaDoll] = useState(null);
 
   // Perfiles de Coleccionistas Reales
   const betaTesters = [
@@ -91,11 +95,11 @@ export default function App() {
   const [catalogSearchTerm, setCatalogSearchTerm] = useState('');
   const [selectedEraFilter, setSelectedEraFilter] = useState('Todas');
 
-  // Modales y Formularios
+  // Modales y Formularios con Edición de Nombre
   const [editingLoreItem, setEditingLoreItem] = useState(null);
   const [certificateItem, setCertificateItem] = useState(null);
   const [comparePriceItem, setComparePriceItem] = useState(null);
-  const [adminLoreForm, setAdminLoreForm] = useState({ lore: '', collection_line: '', release_year: '' });
+  const [adminLoreForm, setAdminLoreForm] = useState({ name: '', lore: '', collection_line: '', release_year: '' });
   const [activeModal, setActiveModal] = useState(null);
   const [userBarbieForm, setUserBarbieForm] = useState({
     quantity: 1,
@@ -134,13 +138,11 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // CARGAR CATÁLOGO MAESTRO Y VITRINA UNIFICADA DESDE SUPABASE
   async function fetchData() {
     setLoading(true);
     try {
       if (!supabase) return;
 
-      // 1. Carga barbies_master
       const { data: masterData, error: masterErr } = await supabase
         .from('barbies_master')
         .select('*')
@@ -170,7 +172,6 @@ export default function App() {
 
       setMasterCatalog(catalog);
 
-      // 2. Carga user_collection (singular)
       const { data: colData, error: colErr } = await supabase
         .from('user_collection')
         .select('*');
@@ -184,12 +185,12 @@ export default function App() {
             ...matchedMaster,
             ...item,
             userInstanceId: item.id,
-            name: matchedMaster.name || item.name || 'Barbie Colección',
-            collection_line: matchedMaster.collection_line || item.collection_line || 'Mattel',
-            release_year: matchedMaster.release_year || item.release_year || 2000,
-            estimated_min_price: matchedMaster.estimated_min_price || item.estimated_min_price || 35,
-            lore: matchedMaster.lore || item.lore || getBarbieLoreFallback(item.name, item.collection_line, item.release_year),
-            image_url: matchedMaster.image_url || item.image_url || null,
+            name: item.name || matchedMaster.name || 'Barbie Colección',
+            collection_line: item.collection_line || matchedMaster.collection_line || 'Mattel',
+            release_year: item.release_year || matchedMaster.release_year || 2000,
+            estimated_min_price: item.estimated_min_price || matchedMaster.estimated_min_price || 35,
+            lore: item.lore || matchedMaster.lore || getBarbieLoreFallback(item.name, item.collection_line, item.release_year),
+            image_url: item.image_url || matchedMaster.image_url || null,
             condition: item.condition || 'NIB'
           };
         });
@@ -217,47 +218,70 @@ export default function App() {
     });
   };
 
+  // ABRIR INSPECTOR DE PUERTAS DE VITRINA
+  const handleOpenVitrinaDoors = (barbie) => {
+    setSelectedVitrinaDoll(barbie);
+    setDoorsOpened(false);
+    setShowVitrinaDoorsModal(true);
+    // Dispara apertura de puertas tras montar el cristal
+    setTimeout(() => setDoorsOpened(true), 300);
+  };
+
   const handleOpenEditLore = (barbie) => {
     setEditingLoreItem(barbie);
     setAdminLoreForm({
+      name: barbie.name || '',
       lore: barbie.lore || '',
       collection_line: barbie.collection_line || '',
       release_year: barbie.release_year || ''
     });
   };
 
-  // GUARDADO PERMANENTE DEL LORE EN SUPABASE (barbies_master)
+  // GUARDADO PERMANENTE DEL NOMBRE, LÍNEA, AÑO Y LORE
   const handleSaveAdminLore = async (e) => {
     e.preventDefault();
     if (!editingLoreItem) return;
 
+    const updatedName = adminLoreForm.name.trim();
     const updatedLore = adminLoreForm.lore;
     const updatedLine = adminLoreForm.collection_line;
     const updatedYear = Number(adminLoreForm.release_year);
 
+    // 1. Guardar en user_collection
+    if (editingLoreItem.userInstanceId && supabase) {
+      const { error: userErr } = await supabase
+        .from('user_collection')
+        .update({ 
+          name: updatedName,
+          lore: updatedLore, 
+          collection_line: updatedLine, 
+          release_year: updatedYear
+        })
+        .eq('id', editingLoreItem.userInstanceId);
+
+      if (userErr) console.error("Error al actualizar user_collection:", userErr);
+    }
+
+    // 2. Guardar en barbies_master
     const masterId = editingLoreItem.barbie_id || editingLoreItem.barbie_master_id || editingLoreItem.id;
-    
     if (masterId && supabase) {
-      const { error } = await supabase
+      const { error: masterErr } = await supabase
         .from('barbies_master')
         .update({ 
+          name: updatedName,
           lore: updatedLore, 
           collection_line: updatedLine, 
           release_year: updatedYear 
         })
         .eq('id', masterId);
 
-      if (error) {
-        console.error("Error al actualizar barbies_master:", error);
-      } else {
-        fetchData(); // Recarga todo para sincronizar el estado persistente
-      }
+      if (masterErr) console.error("Error al actualizar barbies_master:", masterErr);
     }
 
+    await fetchData(); // Sincroniza desde la BD
     setEditingLoreItem(null);
   };
 
-  // AÑADIR A MI VITRINA (user_collection)
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie) return;
@@ -276,7 +300,7 @@ export default function App() {
       if (error) {
         console.error("Error al insertar en user_collection:", error);
       } else {
-        await fetchData(); // Sincroniza desde la BD
+        await fetchData();
       }
     } else {
       setMyCollection(prev => [...prev, { ...barbieSource, userInstanceId: Date.now(), quantity: payload.quantity, condition: payload.condition }]);
@@ -473,20 +497,37 @@ export default function App() {
                 {myCollection.map((item) => (
                   <div key={item.userInstanceId || item.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between">
                     <div>
-                      <div className="h-40 bg-gray-950 p-2 flex items-center justify-center relative">
+                      {/* ÁREA PULSABLE QUE ABRE LAS PUERTAS DE LA VITRINA */}
+                      <div 
+                        onClick={() => handleOpenVitrinaDoors(item)}
+                        className="h-40 bg-gray-950 p-2 flex items-center justify-center relative cursor-pointer group"
+                      >
                         {item.image_url ? (
-                          <img src={item.image_url} alt={item.name} className="max-h-full object-contain rounded-md" />
+                          <img src={item.image_url} alt={item.name} className="max-h-full object-contain rounded-md transition group-hover:scale-105" />
                         ) : (
                           <BarbieSilhouetteFallback />
                         )}
                         <span className="absolute top-1.5 left-1.5 bg-gray-900/90 text-gray-300 text-[8px] px-1.5 py-0.5 rounded font-bold">
                           {item.condition || 'NIB'}
                         </span>
+                        <span className="absolute bottom-1 right-1 bg-pink-950/80 border border-pink-500/40 text-pink-300 text-[8px] px-1.5 py-0.5 rounded font-bold">
+                          🚪 Abrir Vitrina
+                        </span>
                       </div>
                       <div className="p-2.5">
                         <p className="text-[9px] text-pink-400 font-bold uppercase truncate">{item.collection_line}</p>
-                        <h3 className="font-bold text-xs text-white leading-tight line-clamp-1">{item.name}</h3>
-                        <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{item.lore}</p>
+                        <h3 
+                          onClick={() => handleOpenVitrinaDoors(item)}
+                          className="font-bold text-xs text-white leading-tight line-clamp-1 cursor-pointer hover:text-pink-400 transition"
+                        >
+                          {item.name}
+                        </h3>
+                        <p 
+                          onClick={() => handleOpenVitrinaDoors(item)}
+                          className="text-[10px] text-gray-400 mt-1 line-clamp-2 cursor-pointer hover:text-gray-200"
+                        >
+                          {item.lore}
+                        </p>
                       </div>
                     </div>
                     <div className="p-2 border-t border-gray-800 bg-gray-950 flex items-center justify-between">
@@ -502,7 +543,7 @@ export default function App() {
                         <button 
                           onClick={() => handleOpenEditLore(item)}
                           className="bg-gray-800 text-gray-300 text-[10px] p-1 rounded font-bold"
-                          title="Editar Historia"
+                          title="Editar Nombre e Historia"
                         >
                           ✏️
                         </button>
@@ -652,7 +693,7 @@ export default function App() {
                           <button 
                             onClick={() => handleOpenEditLore(barbie)}
                             className="bg-gray-800 text-gray-300 text-[10px] p-1 rounded font-bold w-1/3 flex justify-center"
-                            title="Editar Historia"
+                            title="Editar Nombre e Historia"
                           >
                             ✏️
                           </button>
@@ -724,6 +765,73 @@ export default function App() {
 
       </main>
 
+      {/* MODAL 3D: PUERTAS DE LA VITRINA Y MUESTRARIO */}
+      {showVitrinaDoorsModal && selectedVitrinaDoll && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-sm bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 border-4 border-pink-900/60 rounded-2xl overflow-hidden shadow-2xl p-4">
+            
+            <button 
+              onClick={() => setShowVitrinaDoorsModal(false)}
+              className="absolute top-2 right-2 text-gray-400 hover:text-white font-bold text-sm bg-gray-900/80 rounded-full w-7 h-7 flex items-center justify-center z-50 border border-gray-700"
+            >
+              ✕
+            </button>
+
+            {/* CONTENEDOR 3D CON FOCO Y ESTANTE */}
+            <div className="relative w-full h-80 bg-gradient-to-b from-pink-950/30 to-black rounded-xl overflow-hidden border border-pink-500/30 flex items-center justify-center mb-4">
+              
+              {/* LUZ DE FOCO DE VITRINA */}
+              <div className="absolute top-0 w-32 h-32 bg-pink-500/20 rounded-full blur-2xl pointer-events-none"></div>
+
+              {/* IMAGEN DE LA MUÑECA DENTRO DE LA VITRINA */}
+              <div className="z-10 h-64 p-2 flex items-center justify-center">
+                {selectedVitrinaDoll.image_url ? (
+                  <img src={selectedVitrinaDoll.image_url} alt={selectedVitrinaDoll.name} className="max-h-full object-contain filter drop-shadow-[0_10px_10px_rgba(236,72,153,0.3)]" />
+                ) : (
+                  <BarbieSilhouetteFallback />
+                )}
+              </div>
+
+              {/* ESTANTE DE CRISTAL ILUMINADO */}
+              <div className="absolute bottom-4 w-4/5 h-2 bg-gradient-to-r from-transparent via-pink-400/40 to-transparent rounded-full blur-[1px]"></div>
+
+              {/* PUERTA IZQUIERDA DE CRISTAL TEMPLADO */}
+              <div 
+                className={`absolute top-0 left-0 w-1/2 h-full bg-pink-500/10 border-r border-white/30 backdrop-blur-[2px] transition-transform duration-1000 ease-in-out origin-left flex items-center justify-end pr-2 pointer-events-none z-20 ${
+                  doorsOpened ? '-rotate-y-110 -translate-x-full' : 'rotate-y-0'
+                }`}
+                style={{ transformStyle: 'preserve-3d' }}
+              >
+                <div className="w-1.5 h-12 bg-white/40 rounded-full shadow-md"></div>
+              </div>
+
+              {/* PUERTA DERECHA DE CRISTAL TEMPLADO */}
+              <div 
+                className={`absolute top-0 right-0 w-1/2 h-full bg-pink-500/10 border-l border-white/30 backdrop-blur-[2px] transition-transform duration-1000 ease-in-out origin-right flex items-center justify-start pl-2 pointer-events-none z-20 ${
+                  doorsOpened ? 'rotate-y-110 translate-x-full' : 'rotate-y-0'
+                }`}
+                style={{ transformStyle: 'preserve-3d' }}
+              >
+                <div className="w-1.5 h-12 bg-white/40 rounded-full shadow-md"></div>
+              </div>
+            </div>
+
+            {/* INFORMACIÓN Y HISTORIA DE LA MUÑECA */}
+            <div className="text-left bg-gray-950/80 p-3 rounded-xl border border-pink-900/40">
+              <span className="text-[9px] text-pink-400 font-extrabold uppercase tracking-widest">{selectedVitrinaDoll.collection_line} ({selectedVitrinaDoll.release_year})</span>
+              <h3 className="text-base font-black text-white mt-0.5 leading-snug">{selectedVitrinaDoll.name}</h3>
+              <p className="text-xs text-gray-300 mt-2 leading-relaxed">{selectedVitrinaDoll.lore}</p>
+              
+              <div className="mt-3 pt-2 border-t border-gray-800 flex justify-between items-center text-xs">
+                <span className="text-gray-400">Estado: <strong className="text-white">{selectedVitrinaDoll.condition || 'NIB'}</strong></span>
+                <span className="text-pink-400 font-black text-sm">{selectedVitrinaDoll.estimated_min_price} €</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {/* NAVEGACIÓN INFERIOR FIJA */}
       <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 border-t border-gray-800 z-50 backdrop-blur-lg px-2 py-1.5">
         <div className="max-w-md mx-auto flex justify-around items-center">
@@ -765,21 +873,32 @@ export default function App() {
         </div>
       </nav>
 
-      {/* MODAL: EDITAR HISTORIA / LORE (ADMIN) */}
+      {/* MODAL: EDITAR HISTORIA / NOMBRE / LÍNEA (ADMIN) */}
       {editingLoreItem && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-sm w-full">
-            <h3 className="text-sm font-bold text-pink-500 mb-1">Editar Historia de Barbie</h3>
-            <p className="text-[10px] text-gray-400 mb-3">{editingLoreItem.name}</p>
+            <h3 className="text-sm font-bold text-pink-500 mb-1">Editar Barbie</h3>
+            <p className="text-[10px] text-gray-400 mb-3">Modifica el nombre oficial o la historia registrada.</p>
 
             <form onSubmit={handleSaveAdminLore} className="space-y-3 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Nombre de la Barbie:</label>
+                <input
+                  type="text"
+                  value={adminLoreForm.name}
+                  onChange={(e) => setAdminLoreForm({ ...adminLoreForm, name: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5 text-xs focus:outline-none focus:border-pink-500"
+                  required
+                />
+              </div>
+
               <div>
                 <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Línea de Colección:</label>
                 <input
                   type="text"
                   value={adminLoreForm.collection_line}
                   onChange={(e) => setAdminLoreForm({ ...adminLoreForm, collection_line: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5 text-xs"
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5 text-xs focus:outline-none focus:border-pink-500"
                 />
               </div>
 
@@ -789,7 +908,7 @@ export default function App() {
                   type="number"
                   value={adminLoreForm.release_year}
                   onChange={(e) => setAdminLoreForm({ ...adminLoreForm, release_year: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5 text-xs"
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5 text-xs focus:outline-none focus:border-pink-500"
                 />
               </div>
 
