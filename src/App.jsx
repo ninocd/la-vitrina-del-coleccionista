@@ -1904,49 +1904,66 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
       )}
 
       {/* MODAL: COMPARTIR EN REDES */}
-      {showShareModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-xs w-full relative">
-            <button 
-              onClick={() => setShowShareModal(false)}
-              className="absolute top-2 right-2 text-gray-400 hover:text-white font-bold text-xs"
-            >
-              ✕
-            </button>
-            <h3 className="text-sm font-bold text-pink-500 mb-1">Compartir mi Vitrina</h3>
-            <p className="text-[11px] text-gray-400 mb-3">Pública tu colección en Instagram, WhatsApp o X.</p>
+{showShareModal && (
+  <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-xs w-full relative">
+      <button 
+        onClick={() => setShowShareModal(false)}
+        className="absolute top-2 right-2 text-gray-400 hover:text-white font-bold text-xs"
+      >
+        ✕
+      </button>
+      <h3 className="text-sm font-bold text-pink-500 mb-1">Compartir mi Vitrina</h3>
+      <p className="text-[11px] text-gray-400 mb-3">Publica tu colección en tus redes sociales.</p>
 
-            <div className="space-y-2 text-xs">
-              <a
-                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(getShareText())}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between bg-green-950/60 border border-green-800/80 p-2 rounded text-[11px] font-bold text-green-300"
-              >
-                <span>WhatsApp</span>
-                <span>Enviar ➔</span>
-              </a>
+      <div className="space-y-2 text-xs">
+        {/* WhatsApp */}
+        <a
+          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(getShareText())}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between bg-green-950/60 border border-green-800/80 p-2 rounded text-[11px] font-bold text-green-300 hover:bg-green-900/50 transition"
+        >
+          <span>WhatsApp</span>
+          <span>Enviar ➔</span>
+        </a>
 
-              <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(getShareText())}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between bg-sky-950/60 border border-sky-800/80 p-2 rounded text-[11px] font-bold text-sky-300"
-              >
-                <span>X (Twitter)</span>
-                <span>Postear ➔</span>
-              </a>
+        {/* Facebook */}
+        <a
+          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getPublicVitrinaUrl())}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between bg-blue-950/60 border border-blue-800/80 p-2 rounded text-[11px] font-bold text-blue-300 hover:bg-blue-900/50 transition"
+        >
+          <span>Facebook</span>
+          <span>Compartir ➔</span>
+        </a>
 
-              <button
-                onClick={handleCopyShareLink}
-                className="w-full text-center bg-gray-800 border border-gray-700 p-2 rounded text-[11px] font-bold text-gray-200 mt-1 hover:bg-gray-700 transition"
-              >
-                {copiedLink ? '¡Enlace Copiado!' : 'Copiar Enlace Directo'}
-              </button>
-            </div>
-          </div>
+        {/* X (Twitter) */}
+        <a
+          href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(getShareText())}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between bg-sky-950/60 border border-sky-800/80 p-2 rounded text-[11px] font-bold text-sky-300 hover:bg-sky-900/50 transition"
+        >
+          <span>X (Twitter)</span>
+          <span>Postear ➔</span>
+        </a>
+
+        {/* Copiar enlace para Instagram / TikTok */}
+        <div className="pt-2 border-t border-gray-800">
+          <p className="text-[9px] text-gray-400 mb-1 font-semibold">Para Instagram / TikTok / Bio:</p>
+          <button
+            onClick={handleCopyShareLink}
+            className="w-full text-center bg-pink-600 hover:bg-pink-500 text-white p-2 rounded text-[11px] font-bold transition shadow-md"
+          >
+            {copiedLink ? '¡Enlace Copiado al Portapapeles!' : 'Copiar Enlace de mi Vitrina'}
+          </button>
         </div>
-      )}
+      </div>
+    </div>
+  </div>
+)}
 
       {/* MODAL: CONFIRMAR REGISTRO O UNIDADES REPETIDAS A MI VITRINA */}
       {activeModal?.type === 'add_to_vitrina' && (
