@@ -10,7 +10,7 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
 
-// Silueta vectorial elegante por defecto si no hay imagen
+// Silueta vectorial por defecto si no hay imagen
 const BarbieSilhouetteFallback = () => (
   <div className="w-full h-full bg-gradient-to-b from-gray-900 via-gray-950 to-pink-950/40 flex flex-col items-center justify-center p-2 rounded-lg border border-pink-900/20">
     <svg className="w-10 h-10 text-pink-500/30 mb-1" viewBox="0 0 24 24" fill="currentColor">
@@ -252,7 +252,7 @@ export default function App() {
     }
   };
 
-  // LOG IN / REGISTRO
+  // LOG IN / REGISTRO (CON LÍMITE DE 50 PROBADORES)
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     if (!supabase) {
@@ -279,6 +279,21 @@ export default function App() {
         setAuthPassword('');
       }
     } else {
+      // VERIFICACIÓN DEL LÍMITE DE 50 PROBADORES
+      try {
+        const { count, error: countErr } = await supabase
+          .from('user_collection')
+          .select('user_id', { count: 'exact', head: true });
+
+        if (!countErr && count && count >= 50) {
+          setAuthError("La Versión Beta ha alcanzado el cupo máximo de 50 probadores. ¡Gracias por tu interés!");
+          setAuthSubmitting(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("No se pudo verificar el conteo de usuarios:", err);
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email: authEmail.trim(),
         password: authPassword,
@@ -718,7 +733,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               V
             </div>
             <h1 className="text-base font-black tracking-widest text-pink-500 uppercase">LA VITRINA</h1>
-            <p className="text-[10px] text-gray-400 mt-0.5 tracking-wider uppercase font-semibold">Plataforma de Coleccionismo</p>
+            <p className="text-[10px] text-gray-400 mt-0.5 tracking-wider uppercase font-semibold">Versión Beta Limitada (50 Plazas)</p>
           </div>
 
           <div className="grid grid-cols-2 gap-1 bg-gray-950 p-1 rounded-xl mb-5 border border-gray-800/80">
@@ -780,7 +795,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
             >
               {authSubmitting 
                 ? 'Procesando...' 
-                : (authMode === 'login' ? 'Entrar a La Vitrina' : 'Crear Cuenta')}
+                : (authMode === 'login' ? 'Entrar a La Vitrina' : 'Crear Cuenta (Beta Privada)')}
             </button>
           </form>
 
