@@ -10,13 +10,13 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
 
-// Silueta vectorial por defecto si no hay imagen
+// Silueta vectorial elegante por defecto si no hay imagen
 const BarbieSilhouetteFallback = () => (
-  <div className="w-full h-full bg-gradient-to-b from-gray-900 to-pink-950 flex flex-col items-center justify-center p-2 rounded-lg border border-pink-900/30">
-    <svg className="w-12 h-12 text-pink-500/40 mb-1" viewBox="0 0 24 24" fill="currentColor">
+  <div className="w-full h-full bg-gradient-to-b from-gray-900 via-gray-950 to-pink-950/40 flex flex-col items-center justify-center p-2 rounded-lg border border-pink-900/20">
+    <svg className="w-10 h-10 text-pink-500/30 mb-1" viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
     </svg>
-    <span className="text-[9px] text-pink-400 font-bold uppercase tracking-wider text-center">Sin imagen</span>
+    <span className="text-[8px] text-pink-400/70 font-semibold tracking-widest uppercase text-center">Sin imagen</span>
   </div>
 );
 
@@ -58,13 +58,14 @@ export default function App() {
 
   // Perfiles de Coleccionistas Reales
   const betaTesters = [
-    { id: 1, handle: "@chicledefresadolls", role: "Especialista en Fotografía & Curaduría", badge: "Verified Collector", avatar: "🎀" },
-    { id: 2, handle: "@barbiedecoleccionenespanol", role: "Historiador de Lore & Ediciones Vintage", badge: "Vintage Archivist", avatar: "👑" },
-    { id: 3, handle: "@pm_collectibles", role: "Analista de Mercado & NFRB/MIB", badge: "Market Specialist", avatar: "💎" }
+    { id: 1, handle: "@chicledefresadolls", role: "Especialista en Fotografía & Curaduría", badge: "Verified Collector", avatar: "✦" },
+    { id: 2, handle: "@barbiedecoleccionenespanol", role: "Historiador de Lore & Ediciones Vintage", badge: "Vintage Archivist", avatar: "✧" },
+    { id: 3, handle: "@pm_collectibles", role: "Analista de Mercado & NFRB/MIB", badge: "Market Specialist", avatar: "❖" }
   ];
 
-  // Filtros
+  // Filtros de Búsqueda
   const [catalogSearchTerm, setCatalogSearchTerm] = useState('');
+  const [vitrinaSearchTerm, setVitrinaSearchTerm] = useState('');
   const [selectedEraFilter, setSelectedEraFilter] = useState('Todas');
 
   // Modales y Formularios
@@ -226,7 +227,7 @@ export default function App() {
     }, 450);
   };
 
-  // FUNCIONES DE CONTROL DE ZOOM E INTERACCIÓN
+  // CONTROLES DE ZOOM E INTERACCIÓN
   const handleZoomIn = () => setZoomScale(prev => Math.min(prev + 0.5, 3));
   const handleZoomOut = () => {
     setZoomScale(prev => {
@@ -406,7 +407,7 @@ export default function App() {
     await fetchData();
     setScanResult(null);
     setScannedImageBase64(null);
-    setSaveSuccessMsg('¡Barbie guardada con éxito en el Catálogo Maestro! 📖');
+    setSaveSuccessMsg('¡Barbie guardada con éxito en el Catálogo Maestro!');
     setTimeout(() => setSaveSuccessMsg(''), 3000);
     setActiveTab('catalog');
   };
@@ -443,7 +444,6 @@ export default function App() {
     setActiveTab('vitrina');
   };
 
-  // ESCÁNER IA CON APLICACIÓN DE FONDO BLANCO PERMANENTE
   const handleScanImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -458,26 +458,35 @@ export default function App() {
       
       img.onload = async () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 600;
-        const scale = MAX_WIDTH / img.width;
-        canvas.width = MAX_WIDTH;
-        canvas.height = img.height * scale;
+        const MAX_DIMENSION = 600;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIMENSION) {
+            height *= MAX_DIMENSION / width;
+            width = MAX_DIMENSION;
+          }
+        } else {
+          if (height > MAX_DIMENSION) {
+            width *= MAX_DIMENSION / height;
+            height = MAX_DIMENSION;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
 
         const ctx = canvas.getContext('2d');
-        
-        // PINTAR FONDO BLANCO PURO SÓLIDO (#FFFFFF)
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Renderizar foto sobre el fondo blanco
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        // Generar Base64 JPEG que incluye el fondo blanco de forma permanente
         const fullBase64 = canvas.toDataURL('image/jpeg', 0.5);
         setScannedImageBase64(fullBase64);
         const base64Data = fullBase64.split(',')[1];
 
-        const promptInstruction = `Identifica la Barbie de esta foto de forma precisa para un catálogo de coleccionismo.
+        const promptInstruction = `Identifica la Barbie que aparece en esta foto para un catálogo oficial.
 Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 {
   "primary_match": {
@@ -485,7 +494,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
     "collection_line": "Línea oficial o temática de Mattel",
     "release_year": 2000,
     "estimated_min_price": 45,
-    "lore": "Redacta una historia rica e informativa estructurada para coleccionistas. Incluye: 1) Detalles del vestuario y paleta de colores. 2) Concepto estético o inspiración. 3) Molde facial/escultura de rostro usado (ej. Superstar, Generation Girl, Mackie) y estética de maquillaje. 4) Accesorios y extras incluidos."
+    "lore": "Redacta una historia rica e informativa estructurada para coleccionistas. Incluye: 1) Detalles del vestuario y paleta de colores. 2) Concepto estético o inspiración. 3) Molde facial/escultura de rostro usado y estética de maquillaje. 4) Accesorios y extras incluidos."
   }
 }`;
 
@@ -545,10 +554,10 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
   };
 
   const getShareText = () => {
-    return `¡Te invito a ver mi colección oficial de Barbie en La Vitrina del Coleccionista! 🎀\n\n` +
-      `📊 Piezas catalogadas: ${myCollection.length}\n` +
-      `💰 Valor estimado: ${totalCollectionValueEUR.toLocaleString()} €\n\n` +
-      `Descubre mi colección aquí: ${getPublicVitrinaUrl()}`;
+    return `Te invito a explorar mi colección oficial de Barbie en La Vitrina.\n\n` +
+      `✦ Piezas catalogadas: ${myCollection.length}\n` +
+      `✦ Valor estimado: ${totalCollectionValueEUR.toLocaleString()} €\n\n` +
+      `Ver colección: ${getPublicVitrinaUrl()}`;
   };
 
   const handleCopyShareLink = () => {
@@ -557,6 +566,14 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
+  // Filtrado de Mi Vitrina
+  const filteredMyCollection = myCollection.filter((barbie) => {
+    const nameMatch = (barbie.name || '').toLowerCase().includes(vitrinaSearchTerm.toLowerCase());
+    const lineMatch = (barbie.collection_line || '').toLowerCase().includes(vitrinaSearchTerm.toLowerCase());
+    return nameMatch || lineMatch;
+  });
+
+  // Filtrado del Catálogo Maestro
   const filteredMasterCatalog = masterCatalog.filter((barbie) => {
     const nameMatch = (barbie.name || '').toLowerCase().includes(catalogSearchTerm.toLowerCase());
     const lineMatch = (barbie.collection_line || '').toLowerCase().includes(catalogSearchTerm.toLowerCase());
@@ -575,32 +592,34 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 font-sans pb-24 pt-2 relative">
       
-      {/* CABECERA MÓVIL */}
-      <header className="bg-gray-900/90 border-b border-pink-900/40 px-3 py-2 sticky top-0 z-40 backdrop-blur-md">
+      {/* CABECERA MÓVIL SOBERBIA */}
+      <header className="bg-gray-900/90 border-b border-pink-900/30 px-3.5 py-2.5 sticky top-0 z-40 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <div className="bg-pink-600 text-white font-black rounded-full w-8 h-8 flex items-center justify-center text-base shadow-md shadow-pink-600/30">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-gradient-to-tr from-pink-700 to-pink-500 text-white font-black rounded-lg w-8 h-8 flex items-center justify-center text-sm shadow-md shadow-pink-600/20">
               V
             </div>
             <div>
-              <h1 className="text-sm font-black text-pink-500 tracking-wide leading-none">LA VITRINA</h1>
-              <p className="text-[9px] text-gray-400 leading-none mt-0.5">COLLECTIONS & APP</p>
+              <h1 className="text-xs font-black tracking-widest text-pink-500 uppercase leading-none">LA VITRINA</h1>
+              <p className="text-[9px] text-gray-400 font-medium tracking-wide leading-none mt-0.5">COLLECTIONS</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowMobileMetrics(!showMobileMetrics)}
-              className="bg-gray-800 border border-gray-700 text-pink-400 text-xs px-2.5 py-1 rounded-lg font-bold flex items-center gap-1"
+              className="bg-gray-800/80 border border-gray-700/80 text-pink-400 text-[11px] px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition hover:bg-gray-800"
             >
-              📊 {currency === 'EUR' ? `${totalCollectionValueEUR}€` : `${Math.round(totalCollectionValueEUR * exchangeRateUSD)}$`}
+              <span className="text-gray-400 font-normal">Valor:</span> {currency === 'EUR' ? `${totalCollectionValueEUR.toLocaleString()} €` : `${Math.round(totalCollectionValueEUR * exchangeRateUSD).toLocaleString()} $`}
             </button>
             <button
               onClick={() => setShowShareModal(true)}
-              className="bg-pink-950 border border-pink-600/50 text-pink-300 text-xs p-1.5 rounded-lg"
+              className="bg-gray-800/80 border border-gray-700/80 text-gray-300 hover:text-pink-400 text-xs p-1.5 rounded-lg transition"
               title="Compartir Vitrina"
             >
-              🌐
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
             </button>
           </div>
         </div>
@@ -609,17 +628,17 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         {showMobileMetrics && (
           <div className="mt-2 pt-2 border-t border-gray-800 grid grid-cols-3 gap-2 text-center text-xs animate-fadeIn">
             <div className="bg-gray-950 p-2 rounded-lg border border-gray-800">
-              <p className="text-[9px] text-gray-400 uppercase font-bold">Valor Total</p>
+              <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Valor Estimado</p>
               <p className="font-extrabold text-pink-400 mt-0.5">
                 {currency === 'EUR' ? `${totalCollectionValueEUR.toLocaleString()} €` : `${Math.round(totalCollectionValueEUR * exchangeRateUSD).toLocaleString()} $`}
               </p>
             </div>
             <div className="bg-gray-950 p-2 rounded-lg border border-gray-800">
-              <p className="text-[9px] text-gray-400 uppercase font-bold">En Vitrina</p>
+              <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">En Vitrina</p>
               <p className="font-extrabold text-white mt-0.5">{myCollection.length} uds.</p>
             </div>
             <div className="bg-gray-950 p-2 rounded-lg border border-gray-800">
-              <p className="text-[9px] text-gray-400 uppercase font-bold">Wishlist</p>
+              <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Deseadas</p>
               <p className="font-extrabold text-pink-300 mt-0.5">{wishlist.length} pcs.</p>
             </div>
           </div>
@@ -632,29 +651,42 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         {/* TAB: MI VITRINA */}
         {activeTab === 'vitrina' && (
           <section>
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="text-base font-bold text-white">Mi Colección ({myCollection.length})</h2>
+            {/* BUSCADOR FLOTANTE FLUIDO EN VITRINA */}
+            <div className="sticky top-12 z-30 bg-gray-900/95 backdrop-blur-md p-2 rounded-xl mb-3 border border-pink-900/30 flex items-center gap-2 shadow-lg">
+              <div className="relative w-full">
+                <input
+                  type="text"
+                  placeholder="Filtrar en mi Vitrina..."
+                  value={vitrinaSearchTerm}
+                  onChange={(e) => setVitrinaSearchTerm(e.target.value)}
+                  className="w-full bg-gray-800/90 border border-gray-700/80 text-white rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-pink-500/80"
+                />
+                <svg className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+
               <button 
                 onClick={() => setCurrency(currency === 'EUR' ? 'USD' : 'EUR')}
-                className="text-[10px] bg-gray-900 border border-gray-700 text-pink-400 px-2 py-1 rounded-md font-bold"
+                className="text-[10px] bg-gray-800 hover:bg-gray-700 border border-gray-700 text-pink-400 px-2.5 py-1.5 rounded-lg font-bold shrink-0 transition"
               >
-                {currency === 'EUR' ? 'Moneda: €' : 'Moneda: $'}
+                {currency === 'EUR' ? '€ EUR' : '$ USD'}
               </button>
             </div>
 
-            {myCollection.length === 0 ? (
-              <div className="text-center py-10 bg-gray-900 rounded-xl border border-gray-800 text-gray-400 text-xs px-4">
-                Aún no tienes muñecas en tu Vitrina. Usa el catálogo para añadir tus Barbies.
+            {filteredMyCollection.length === 0 ? (
+              <div className="text-center py-12 bg-gray-900/60 rounded-xl border border-gray-800/80 text-gray-400 text-xs px-4">
+                {vitrinaSearchTerm ? 'No se encontraron coincidencias en tu vitrina.' : 'Aún no tienes muñecas en tu Vitrina. Explora el catálogo para añadirlas.'}
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                {myCollection.map((item) => (
-                  <div key={item.userInstanceId || item.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between group relative">
+                {filteredMyCollection.map((item) => (
+                  <div key={item.userInstanceId || item.id} className="bg-gray-900/90 border border-gray-800/90 rounded-xl overflow-hidden flex flex-col justify-between group relative">
                     <div>
-                      {/* CAJA DE VITRINA 3D CON FONDO BLANCO */}
+                      {/* CAJA DE VITRINA CON FONDO BLANCO PURO */}
                       <div 
                         onClick={() => handleOpenVitrinaDoll(item)}
-                        className="h-44 bg-white p-2 flex items-center justify-center relative cursor-pointer overflow-hidden border-b border-gray-800"
+                        className="h-44 bg-white p-2 flex items-center justify-center relative cursor-pointer overflow-hidden border-b border-gray-800/80"
                         style={{ perspective: '600px' }}
                       >
                         <div className="absolute top-0 w-24 h-24 bg-pink-500/10 rounded-full blur-lg pointer-events-none"></div>
@@ -682,13 +714,13 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                           <div className="w-1 h-8 bg-gray-400/50 rounded-full shadow"></div>
                         </div>
 
-                        <span className="absolute top-1.5 left-1.5 bg-gray-900/90 text-gray-300 text-[8px] px-1.5 py-0.5 rounded font-bold z-30">
+                        <span className="absolute top-1.5 left-1.5 bg-gray-900/90 text-gray-300 text-[8px] px-1.5 py-0.5 rounded font-bold z-30 tracking-wider">
                           {item.condition || 'NIB'}
                         </span>
                       </div>
 
                       <div className="p-2.5">
-                        <p className="text-[9px] text-pink-400 font-bold uppercase truncate">{item.collection_line}</p>
+                        <p className="text-[9px] text-pink-400 font-bold uppercase truncate tracking-wider">{item.collection_line}</p>
                         <h3 
                           onClick={() => handleOpenVitrinaDoll(item)}
                           className="font-bold text-xs text-white leading-tight line-clamp-1 cursor-pointer hover:text-pink-400 transition"
@@ -705,29 +737,35 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                     </div>
                     
                     {/* BOTONES DE ACCIÓN EN VITRINA */}
-                    <div className="p-2 border-t border-gray-800 bg-gray-950 flex items-center justify-between">
+                    <div className="p-2 border-t border-gray-800/80 bg-gray-950/80 flex items-center justify-between">
                       <span className="text-pink-400 font-extrabold text-xs">{item.estimated_min_price} €</span>
                       <div className="flex gap-1">
                         <button 
                           onClick={() => handleOpenEditPrice(item)}
-                          className="bg-gray-800 text-yellow-400 text-[10px] p-1 rounded font-bold hover:bg-gray-700"
+                          className="bg-gray-800 text-yellow-400 text-[10px] p-1.5 rounded hover:bg-gray-700 transition"
                           title="Cambiar Precio"
                         >
-                          💰
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
                         </button>
                         <button 
                           onClick={() => handleOpenEditLore(item)}
-                          className="bg-gray-800 text-gray-300 text-[10px] p-1 rounded font-bold hover:bg-gray-700"
+                          className="bg-gray-800 text-gray-300 text-[10px] p-1.5 rounded hover:bg-gray-700 transition"
                           title="Editar Nombre e Historia"
                         >
-                          ✏️
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
                         </button>
                         <button 
                           onClick={() => handleDeleteFromVitrina(item.userInstanceId)}
-                          className="bg-red-950/80 text-red-300 border border-red-800/60 text-[10px] p-1 rounded font-bold hover:bg-red-900"
+                          className="bg-red-950/60 text-red-400 border border-red-900/50 text-[10px] p-1.5 rounded hover:bg-red-900/80 transition"
                           title="Eliminar de Mi Vitrina"
                         >
-                          🗑️
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
                         </button>
                       </div>
                     </div>
@@ -738,11 +776,11 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
           </section>
         )}
 
-        {/* TAB: ESCÁNER CON GUARDADO DIRECTO AL CATÁLOGO MAESTRO Y FONDO BLANCO */}
+        {/* TAB: ESCÁNER CON GUARDADO DIRECTO AL CATÁLOGO MAESTRO */}
         {activeTab === 'scan' && (
-          <section className="max-w-md mx-auto bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl">
-            <h2 className="text-base font-extrabold text-pink-500 text-center mb-1">Escáner de Catalogación IA</h2>
-            <p className="text-[11px] text-gray-400 text-center mb-4">Fotografía la Barbie para identificarla y registrarla directamente en el Catálogo Maestro.</p>
+          <section className="max-w-md mx-auto bg-gray-900/90 border border-gray-800 rounded-xl p-4 shadow-xl">
+            <h2 className="text-sm font-extrabold text-pink-500 tracking-wider uppercase text-center mb-1">Escáner de Catalogación IA</h2>
+            <p className="text-[11px] text-gray-400 text-center mb-4">Fotografía la Barbie para encuadrarla, identificarla y registrarla automáticamente.</p>
 
             {saveSuccessMsg && (
               <div className="mb-3 p-2 bg-green-950/80 border border-green-600 text-green-300 text-xs text-center rounded-lg font-bold">
@@ -750,9 +788,13 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               </div>
             )}
 
-            <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-700 rounded-xl p-4 bg-gray-950">
-              <label className="bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer transition shadow-lg shadow-pink-600/30">
-                📷 Tomar Foto con la Cámara
+            <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-700/80 rounded-xl p-5 bg-gray-950">
+              <label className="bg-gradient-to-r from-pink-600 to-pink-500 hover:from-pink-500 hover:to-pink-400 text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer transition shadow-lg shadow-pink-600/20 flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Tomar Foto con la Cámara
                 <input 
                   type="file" 
                   accept="image/*" 
@@ -764,14 +806,14 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
               {scannedImageBase64 && (
                 <div className="mt-3 text-center">
-                  <p className="text-[9px] text-gray-400 mb-1 font-bold">Vista previa (Fondo Blanco Aplicado):</p>
-                  <img src={scannedImageBase64} alt="Captura" className="max-h-48 rounded-lg border border-gray-800 mx-auto bg-white p-1" />
+                  <p className="text-[9px] text-gray-400 mb-1 font-bold">Vista previa:</p>
+                  <img src={scannedImageBase64} alt="Captura" className="max-h-48 rounded-lg border border-gray-800 mx-auto bg-white p-1 object-contain" />
                 </div>
               )}
             </div>
 
             {scanning && (
-              <div className="mt-4 p-3 bg-gray-950 rounded-lg border border-pink-900/50 text-center text-pink-400 font-bold text-xs animate-pulse">
+              <div className="mt-4 p-3 bg-gray-950 rounded-lg border border-pink-900/40 text-center text-pink-400 font-bold text-xs animate-pulse">
                 Identificando modelo y redactando historia documental...
               </div>
             )}
@@ -784,7 +826,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
             {scanResult && scanResult.primary_match && (
               <div className="mt-4 bg-gray-950 border border-pink-600/40 rounded-xl p-4">
-                <span className="bg-pink-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase">Identificada</span>
+                <span className="bg-pink-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">Identificada</span>
                 <h3 className="text-sm font-black text-white mt-1">{scanResult.primary_match.name}</h3>
                 <p className="text-[10px] text-pink-400 font-bold mb-2">{scanResult.primary_match.collection_line} ({scanResult.primary_match.release_year})</p>
                 <p className="text-[11px] text-gray-300 leading-relaxed bg-gray-900/80 p-2.5 rounded-lg border border-gray-800 max-h-44 overflow-y-auto mb-3">
@@ -798,9 +840,9 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                   </div>
                   <button 
                     onClick={handleSaveDirectToCatalog}
-                    className="bg-pink-600 hover:bg-pink-500 text-white text-xs px-4 py-2 rounded-lg font-bold transition shadow-md flex items-center gap-1"
+                    className="bg-pink-600 hover:bg-pink-500 text-white text-xs px-3.5 py-2 rounded-lg font-bold transition shadow-md flex items-center gap-1.5"
                   >
-                    📖 Guardar en Catálogo Maestro
+                    Guardar en Catálogo Maestro
                   </button>
                 </div>
               </div>
@@ -811,22 +853,27 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         {/* TAB: CATÁLOGO MAESTRO */}
         {activeTab === 'catalog' && (
           <section>
-            {/* BARRA DE BÚSQUEDA Y FILTROS FLOTANTES (STICKY) SIN INTERFERIR */}
-            <div className="sticky top-12 z-30 bg-gray-900/95 backdrop-blur-md p-2.5 rounded-xl mb-3 border border-pink-900/40 flex flex-col gap-2 shadow-lg">
-              <input
-                type="text"
-                placeholder="🔍 Buscar Barbie o línea..."
-                value={catalogSearchTerm}
-                onChange={(e) => setCatalogSearchTerm(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-pink-500"
-              />
+            {/* BARRA DE BÚSQUEDA Y FILTROS FLOTANTES (STICKY) */}
+            <div className="sticky top-12 z-30 bg-gray-900/95 backdrop-blur-md p-2.5 rounded-xl mb-3 border border-pink-900/30 flex flex-col gap-2 shadow-lg">
+              <div className="relative w-full">
+                <input
+                  type="text"
+                  placeholder="Buscar en el catálogo general..."
+                  value={catalogSearchTerm}
+                  onChange={(e) => setCatalogSearchTerm(e.target.value)}
+                  className="w-full bg-gray-800/90 border border-gray-700/80 text-white rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-pink-500/80"
+                />
+                <svg className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
 
               <div className="flex justify-between items-center text-xs">
-                <span className="text-[10px] font-bold text-pink-400 uppercase">Época:</span>
+                <span className="text-[10px] font-bold text-pink-400 uppercase tracking-wider">Época:</span>
                 <select
                   value={selectedEraFilter}
                   onChange={(e) => setSelectedEraFilter(e.target.value)}
-                  className="bg-gray-800 border border-gray-700 text-white rounded-md px-2 py-1 text-[11px]"
+                  className="bg-gray-800 border border-gray-700/80 text-white rounded-md px-2 py-1 text-[11px]"
                 >
                   <option value="Todas">Todas las Épocas</option>
                   <option value="Vintage (1959-1989)">Vintage (1959-89)</option>
@@ -843,7 +890,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                 {filteredMasterCatalog.map((barbie) => {
                   const isWishlisted = wishlist.some(item => item.id === barbie.id);
                   return (
-                    <div key={barbie.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between">
+                    <div key={barbie.id} className="bg-gray-900 border border-gray-800/90 rounded-xl overflow-hidden flex flex-col justify-between">
                       <div>
                         {/* CONTENEDOR CON FONDO BLANCO PURO */}
                         <div className="h-40 bg-white p-2 flex items-center justify-center relative">
@@ -852,59 +899,65 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                           ) : (
                             <BarbieSilhouetteFallback />
                           )}
-                          <span className="absolute top-1.5 right-1.5 bg-pink-950/90 text-pink-300 text-[8px] px-1.5 py-0.5 rounded font-bold">
+                          <span className="absolute top-1.5 right-1.5 bg-gray-900/90 text-pink-300 text-[8px] px-1.5 py-0.5 rounded font-bold tracking-wider">
                             {barbie.release_year}
                           </span>
                           <button 
                             onClick={() => toggleWishlist(barbie)}
                             className={`absolute top-1.5 left-1.5 p-1 rounded-full text-xs transition ${isWishlisted ? 'bg-pink-600 text-white' : 'bg-gray-900/80 text-gray-400'}`}
                           >
-                            {isWishlisted ? '💖' : '🤍'}
+                            {isWishlisted ? '✦' : '✧'}
                           </button>
                         </div>
                         <div className="p-2">
-                          <p className="text-[9px] text-pink-400 font-bold uppercase truncate">{barbie.collection_line}</p>
+                          <p className="text-[9px] text-pink-400 font-bold uppercase truncate tracking-wider">{barbie.collection_line}</p>
                           <h3 className="font-bold text-xs text-white leading-tight line-clamp-1">{barbie.name}</h3>
                           <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{barbie.lore}</p>
                         </div>
                       </div>
 
                       {/* CONTROLES DEL CATÁLOGO MAESTRO */}
-                      <div className="p-2 border-t border-gray-800/80 bg-gray-950 flex flex-col gap-1.5">
+                      <div className="p-2 border-t border-gray-800/80 bg-gray-950/80 flex flex-col gap-1.5">
                         <div className="flex justify-between items-center">
                           <span className="text-pink-400 font-extrabold text-xs">{barbie.estimated_min_price} €</span>
                           <button 
                             onClick={() => setComparePriceItem(barbie)}
-                            className="bg-gray-800 text-[10px] px-1.5 py-0.5 rounded text-pink-300 font-bold"
+                            className="bg-gray-800 text-[10px] px-2 py-0.5 rounded text-pink-300 font-bold hover:bg-gray-700 transition"
                           >
-                            🔍 Precios
+                            Mercados
                           </button>
                         </div>
                         <div className="flex gap-1">
                           <button 
                             onClick={() => handleOpenEditPrice(barbie)}
-                            className="bg-gray-800 text-yellow-400 text-[10px] p-1 rounded font-bold w-1/4 flex justify-center hover:bg-gray-700"
+                            className="bg-gray-800 text-yellow-400 text-[10px] p-1.5 rounded font-bold w-1/4 flex justify-center hover:bg-gray-700 transition"
                             title="Editar Precio"
                           >
-                            💰
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
                           </button>
                           <button 
                             onClick={() => handleOpenEditLore(barbie)}
-                            className="bg-gray-800 text-gray-300 text-[10px] p-1 rounded font-bold w-1/4 flex justify-center hover:bg-gray-700"
+                            className="bg-gray-800 text-gray-300 text-[10px] p-1.5 rounded font-bold w-1/4 flex justify-center hover:bg-gray-700 transition"
                             title="Editar Nombre e Historia"
                           >
-                            ✏️
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
                           </button>
                           <button 
                             onClick={() => handleDeleteFromCatalog(barbie.id)}
-                            className="bg-red-950/80 text-red-300 border border-red-800/60 text-[10px] p-1 rounded font-bold w-1/4 flex justify-center hover:bg-red-900"
+                            className="bg-red-950/60 text-red-400 border border-red-900/50 text-[10px] p-1.5 rounded font-bold w-1/4 flex justify-center hover:bg-red-900/80 transition"
                             title="Borrar del Catálogo Maestro"
                           >
-                            🗑️
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
                           </button>
                           <button 
                             onClick={() => setActiveModal({ type: 'add_to_vitrina', barbie })}
-                            className="bg-pink-600 text-white text-[10px] font-bold py-1 rounded w-1/4 hover:bg-pink-500 flex justify-center"
+                            className="bg-pink-600 text-white text-[11px] font-bold py-1 rounded w-1/4 hover:bg-pink-500 flex items-center justify-center transition"
                             title="Añadir a Vitrina"
                           >
                             +
@@ -922,7 +975,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         {/* TAB: MARKETPLACE */}
         {activeTab === 'sales' && (
           <section className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <h2 className="text-base font-bold text-pink-500 mb-1">Anuncios de Venta</h2>
+            <h2 className="text-sm font-extrabold text-pink-500 tracking-wider uppercase mb-1">Anuncios de Venta</h2>
             <p className="text-[11px] text-gray-400 mb-4">Copia textos optimizados para Vinted, Wallapop y eBay.</p>
 
             {myCollection.length === 0 ? (
@@ -936,9 +989,9 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
                     <button 
                       onClick={() => navigator.clipboard.writeText(`Barbie ${item.name} (${item.release_year}) - Estado: ${item.condition}. ${item.lore}`)}
-                      className="mt-2 w-full bg-pink-600 hover:bg-pink-500 text-white text-[11px] font-bold py-1.5 rounded transition"
+                      className="mt-2.5 w-full bg-pink-600 hover:bg-pink-500 text-white text-[11px] font-bold py-1.5 rounded transition flex items-center justify-center gap-1.5"
                     >
-                      📋 Copiar Texto de Anuncio
+                      Copiar Anuncio Optimizado
                     </button>
                   </div>
                 ))}
@@ -950,13 +1003,13 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         {/* TAB: COMUNIDAD */}
         {activeTab === 'community' && (
           <section className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-            <h2 className="text-base font-bold text-pink-500 mb-1">Coleccionistas Beta</h2>
-            <p className="text-[11px] text-gray-400 mb-4">Perfiles de curadores y colaboradores.</p>
+            <h2 className="text-sm font-extrabold text-pink-500 tracking-wider uppercase mb-1">Red de Curadores</h2>
+            <p className="text-[11px] text-gray-400 mb-4">Perfiles de coleccionistas y colaboradores comprobados.</p>
             
             <div className="space-y-3">
               {betaTesters.map((tester) => (
                 <div key={tester.id} className="bg-gray-950 p-3 rounded-lg border border-gray-800 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-pink-950/80 border border-pink-500/40 rounded-full flex items-center justify-center text-lg">
+                  <div className="w-9 h-9 bg-pink-950/80 border border-pink-500/30 rounded-full flex items-center justify-center text-sm font-bold text-pink-400">
                     {tester.avatar}
                   </div>
                   <div>
@@ -971,14 +1024,17 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
       </main>
 
-      {/* BOTÓN FLOTANTE "VOLVER ARRIBA" */}
+      {/* BOTÓN FLOTANTE ELEGANTE "VOLVER ARRIBA" */}
       {showScrollTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-16 right-4 bg-pink-600 hover:bg-pink-500 text-white text-xs font-black px-3 py-2 rounded-full shadow-2xl border border-pink-400/40 z-40 transition-all transform hover:scale-110 flex items-center gap-1 animate-bounce"
+          className="fixed bottom-16 right-4 bg-gray-900/90 hover:bg-pink-600 text-gray-200 hover:text-white text-[11px] font-semibold px-3 py-1.5 rounded-full shadow-xl border border-gray-700/80 hover:border-pink-500 z-40 transition-all flex items-center gap-1 backdrop-blur-md"
           title="Volver arriba"
         >
-          🚀 Arriba
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+          Subir
         </button>
       )}
 
@@ -1004,16 +1060,16 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               <button 
                 onClick={handleZoomIn} 
                 className="bg-gray-800 hover:bg-pink-600 text-white font-bold text-xs px-2 py-0.5 rounded transition"
-                title="Acercar (Zoom +)"
+                title="Acercar"
               >
-                🔍+
+                +
               </button>
               <button 
                 onClick={handleZoomOut} 
                 className="bg-gray-800 hover:bg-pink-600 text-white font-bold text-xs px-2 py-0.5 rounded transition"
-                title="Alejar (Zoom -)"
+                title="Alejar"
               >
-                🔍-
+                -
               </button>
               {zoomScale > 1 && (
                 <button 
@@ -1025,7 +1081,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               )}
             </div>
 
-            {/* MARCO DE EXHIBICIÓN DE FOTO CON LÓGICA DE ZOOM Y ARRASTRE */}
+            {/* MARCO DE EXHIBICIÓN CON FOTO SOBRE BLANCO */}
             <div 
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
@@ -1094,48 +1150,63 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         </div>
       )}
 
-      {/* NAVEGACIÓN INFERIOR FIJA */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 border-t border-gray-800 z-50 backdrop-blur-lg px-2 py-1.5">
+      {/* NAVEGACIÓN INFERIOR ELEGANTE Y MINIMALISTA */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 border-t border-gray-800 z-50 backdrop-blur-lg px-2 py-2">
         <div className="max-w-md mx-auto flex justify-around items-center">
           <button 
             onClick={() => setActiveTab('vitrina')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition ${activeTab === 'vitrina' ? 'text-pink-500' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${activeTab === 'vitrina' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-200'}`}
           >
-            <span className="text-base">💎</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
             <span>Vitrina</span>
           </button>
+          
           <button 
             onClick={() => setActiveTab('scan')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition ${activeTab === 'scan' ? 'text-pink-500' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${activeTab === 'scan' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-200'}`}
           >
-            <span className="text-base">📷</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
             <span>Escáner</span>
           </button>
+
           <button 
             onClick={() => setActiveTab('catalog')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition ${activeTab === 'catalog' ? 'text-pink-500' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${activeTab === 'catalog' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-200'}`}
           >
-            <span className="text-base">📖</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
             <span>Catálogo</span>
           </button>
+
           <button 
             onClick={() => setActiveTab('sales')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition ${activeTab === 'sales' ? 'text-pink-500' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${activeTab === 'sales' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-200'}`}
           >
-            <span className="text-base">🏷️</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
             <span>Ventas</span>
           </button>
+
           <button 
             onClick={() => setActiveTab('community')}
-            className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition ${activeTab === 'community' ? 'text-pink-500' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-1 text-[10px] font-semibold transition ${activeTab === 'community' ? 'text-pink-500' : 'text-gray-400 hover:text-gray-200'}`}
           >
-            <span className="text-base">👥</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5 5 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
             <span>Red</span>
           </button>
         </div>
       </nav>
 
-      {/* MODAL: EDITAR PRECIO (💰) */}
+      {/* MODAL: EDITAR PRECIO */}
       {editingPriceItem && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-xs w-full">
@@ -1166,7 +1237,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                   type="submit"
                   className="bg-pink-600 hover:bg-pink-500 text-white px-3 py-1.5 rounded font-bold text-xs"
                 >
-                  Guardar Precio
+                  Guardar
                 </button>
               </div>
             </form>
@@ -1178,8 +1249,8 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
       {editingLoreItem && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-sm w-full">
-            <h3 className="text-sm font-bold text-pink-500 mb-1">Editar Barbie</h3>
-            <p className="text-[10px] text-gray-400 mb-3">Modifica el nombre oficial o la historia registrada.</p>
+            <h3 className="text-sm font-bold text-pink-500 mb-1">Editar Registro</h3>
+            <p className="text-[10px] text-gray-400 mb-3">Modifica la información registrada de la muñeca.</p>
 
             <form onSubmit={handleSaveAdminLore} className="space-y-3 text-xs">
               <div>
@@ -1214,7 +1285,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Historia / Lore Permanente:</label>
+                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Historia / Lore:</label>
                 <textarea
                   rows="5"
                   value={adminLoreForm.lore}
@@ -1235,7 +1306,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                   type="submit"
                   className="bg-pink-600 hover:bg-pink-500 text-white px-3 py-1.5 rounded font-bold text-xs"
                 >
-                  Guardar Permanente
+                  Guardar
                 </button>
               </div>
             </form>
@@ -1253,7 +1324,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
             >
               ✕
             </button>
-            <h3 className="text-sm font-bold text-pink-500 mb-1">Precios en Mercado</h3>
+            <h3 className="text-sm font-bold text-pink-500 mb-1">Comparar Mercado</h3>
             <p className="text-[11px] text-gray-400 mb-3">{comparePriceItem.name}</p>
 
             <div className="space-y-1.5 text-xs">
@@ -1263,10 +1334,10 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-between bg-gray-950 p-2 rounded border border-gray-800 text-[11px] font-bold text-white uppercase hover:border-pink-500/50"
+                  className="flex items-center justify-between bg-gray-950 p-2 rounded border border-gray-800 text-[11px] font-bold text-white uppercase hover:border-pink-500/50 transition"
                 >
                   <span>{platform}</span>
-                  <span className="text-pink-400">Buscar ➔</span>
+                  <span className="text-pink-400 text-xs">➔</span>
                 </a>
               ))}
             </div>
@@ -1285,14 +1356,14 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               ✕
             </button>
             <h3 className="text-sm font-bold text-pink-500 mb-1">Compartir Vitrina</h3>
-            <p className="text-[11px] text-gray-400 mb-3">Publica tu colección en redes sociales.</p>
+            <p className="text-[11px] text-gray-400 mb-3">Enlace público a tu colección.</p>
 
             <div className="space-y-2 text-xs">
               <a
                 href={`https://api.whatsapp.com/send?text=${encodeURIComponent(getShareText())}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-between bg-green-950/60 border border-green-800 p-2 rounded text-[11px] font-bold text-green-300"
+                className="flex items-center justify-between bg-green-950/60 border border-green-800/80 p-2 rounded text-[11px] font-bold text-green-300"
               >
                 <span>WhatsApp</span>
                 <span>Enviar ➔</span>
@@ -1302,7 +1373,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                 href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(getShareText())}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-between bg-sky-950/60 border border-sky-800 p-2 rounded text-[11px] font-bold text-sky-300"
+                className="flex items-center justify-between bg-sky-950/60 border border-sky-800/80 p-2 rounded text-[11px] font-bold text-sky-300"
               >
                 <span>X (Twitter)</span>
                 <span>Postear ➔</span>
@@ -1310,7 +1381,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
               <button
                 onClick={handleCopyShareLink}
-                className="w-full text-center bg-gray-800 border border-gray-700 p-2 rounded text-[11px] font-bold text-gray-200 mt-1"
+                className="w-full text-center bg-gray-800 border border-gray-700 p-2 rounded text-[11px] font-bold text-gray-200 mt-1 hover:bg-gray-700 transition"
               >
                 {copiedLink ? '¡Enlace Copiado!' : 'Copiar Enlace Directo'}
               </button>
@@ -1328,7 +1399,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
             <form onSubmit={handleAddToMyVitrina} className="space-y-3 text-xs">
               <div>
-                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Estado:</label>
+                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Estado de Conservación:</label>
                 <select
                   value={userBarbieForm.condition}
                   onChange={(e) => setUserBarbieForm({ ...userBarbieForm, condition: e.target.value })}
