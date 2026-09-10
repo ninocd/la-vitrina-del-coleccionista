@@ -240,7 +240,6 @@ export default function App() {
     setEditingLoreItem(null);
   };
 
-  // APERTURA Y GUARDADO DE EDICIÓN DE PRECIO DIRECTA
   const handleOpenEditPrice = (barbie) => {
     setEditingPriceItem(barbie);
     setNewPriceValue(barbie.estimated_min_price || '');
@@ -275,7 +274,6 @@ export default function App() {
     setNewPriceValue('');
   };
 
-  // ELIMINAR DE MI VITRINA
   const handleDeleteFromVitrina = async (userInstanceId) => {
     if (!window.confirm("¿Seguro que deseas quitar esta Barbie de tu vitrina?")) return;
 
@@ -295,7 +293,6 @@ export default function App() {
     setMyCollection(prev => prev.filter(item => item.userInstanceId !== userInstanceId));
   };
 
-  // ELIMINAR DEL CATÁLOGO MAESTRO
   const handleDeleteFromCatalog = async (masterId) => {
     if (!window.confirm("¿Seguro que deseas borrar esta Barbie del Catálogo Maestro?")) return;
 
@@ -326,7 +323,6 @@ export default function App() {
     }
   };
 
-  // GUARDA DIRECTAMENTE EN EL CATÁLOGO MAESTRO (barbies_master) DESDE EL ESCÁNER
   const handleSaveDirectToCatalog = async () => {
     if (!scanResult?.primary_match) return;
 
@@ -360,7 +356,6 @@ export default function App() {
     setActiveTab('catalog');
   };
 
-  // AÑADIR A MI VITRINA
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie) return;
@@ -393,6 +388,7 @@ export default function App() {
     setActiveTab('vitrina');
   };
 
+  // ESCÁNER IA ULTRA COMPRIMIDO (REDUCCIÓN A 600px / COMPRESIÓN 0.5 JPEG PARA RESPUESTA EN 2s)
   const handleScanImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -407,7 +403,7 @@ export default function App() {
       
       img.onload = async () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 800;
+        const MAX_WIDTH = 600; // Ancho óptimo ultrarrápido
         const scale = MAX_WIDTH / img.width;
         canvas.width = MAX_WIDTH;
         canvas.height = img.height * scale;
@@ -415,7 +411,8 @@ export default function App() {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        const fullBase64 = canvas.toDataURL('image/jpeg', 0.8);
+        // Compresión optimizada al 50% para envío ultraligero (<100KB)
+        const fullBase64 = canvas.toDataURL('image/jpeg', 0.5);
         setScannedImageBase64(fullBase64);
         const base64Data = fullBase64.split(',')[1];
 
