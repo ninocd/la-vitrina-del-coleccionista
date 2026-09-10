@@ -119,14 +119,14 @@ export default function App() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchData();
+      if (session) fetchData(session.user.id);
       else setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
-        fetchData();
+        fetchData(session.user.id);
       } else {
         setMyCollection([]);
         setLoading(false);
@@ -136,11 +136,12 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  async function fetchData() {
+  async function fetchData(userId) {
     setLoading(true);
     try {
       if (!supabase) return;
 
+      // 1. EL CATÁLOGO MAESTRO ES GLOBAL (SE MANTIENE IGUAL PARA TODOS)
       const { data: masterData, error: masterErr } = await supabase
         .from('barbies_master')
         .select('*')
@@ -170,9 +171,17 @@ export default function App() {
 
       setMasterCatalog(catalog);
 
+      // 2. MI VITRINA SE FILTRA ÚNICAMENTE PARA EL USUARIO AUTENTICADO
+      const currentUserId = userId || session?.user?.id;
+      if (!currentUserId) {
+        setMyCollection([]);
+        return;
+      }
+
       const { data: colData, error: colErr } = await supabase
         .from('user_collection')
-        .select('*');
+        .select('*')
+        .eq('user_id', currentUserId);
 
       if (colErr) console.error("Error cargando user_collection:", colErr);
 
@@ -362,7 +371,7 @@ export default function App() {
       if (masterErr) console.error("Error al actualizar barbies_master:", masterErr);
     }
 
-    await fetchData();
+    await fetchData(session?.user?.id);
     setEditingLoreItem(null);
   };
 
@@ -395,7 +404,7 @@ export default function App() {
       }
     }
 
-    await fetchData();
+    await fetchData(session?.user?.id);
     setEditingPriceItem(null);
     setNewPriceValue('');
   };
@@ -440,11 +449,11 @@ export default function App() {
         if (masterErr) {
           console.error("Error directo de Supabase:", masterErr);
           alert(`Aviso de Supabase: ${masterErr.message}.`);
-          await fetchData();
+          await fetchData(session?.user?.id);
         }
       } catch (err) {
         console.error("Excepción en borrado:", err);
-        await fetchData();
+        await fetchData(session?.user?.id);
       }
     }
   };
@@ -474,7 +483,7 @@ export default function App() {
       setMasterCatalog(prev => [...prev, { ...payloadMaster, id: Date.now() }]);
     }
 
-    await fetchData();
+    await fetchData(session?.user?.id);
     setScanResult(null);
     setScannedImageBase64(null);
     setSaveSuccessMsg('¡Barbie guardada con éxito en el Catálogo Maestro!');
@@ -489,9 +498,9 @@ export default function App() {
     const barbieSource = activeModal.barbie;
     const condClean = userBarbieForm.condition ? userBarbieForm.condition.split(' ')[0] : 'NIB';
 
-    if (supabase) {
+    if (supabase && session?.user?.id) {
       const payload = {
-        user_id: session?.user?.id || 'default-user',
+        user_id: session.user.id,
         barbie_id: barbieSource.id,
         quantity: Math.max(1, Number(userBarbieForm.quantity || 1)),
         condition: condClean
@@ -504,7 +513,7 @@ export default function App() {
         alert(`No se pudo añadir a la vitrina: ${error.message}`);
         return;
       } else {
-        await fetchData();
+        await fetchData(session.user.id);
       }
     } else {
       setMyCollection(prev => [...prev, { ...barbieSource, userInstanceId: Date.now(), quantity: 1, condition: condClean }]);
@@ -808,7 +817,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
       {/* VISTA PRINCIPAL */}
       <main className="max-w-7xl mx-auto px-3 mt-3">
 
-        {/* TAB: MI VITRINA */}
+        {/* TAB: MI VITRINA (PRIVADA POR USUARIO) */}
         {activeTab === 'vitrina' && (
           <section>
             {/* BUSCADOR FLOTANTE FLUIDO EN VITRINA */}
@@ -836,7 +845,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
             {filteredMyCollection.length === 0 ? (
               <div className="text-center py-12 bg-gray-900/60 rounded-xl border border-gray-800/80 text-gray-400 text-xs px-4">
-                {vitrinaSearchTerm ? 'No se encontraron coincidencias en tu vitrina.' : 'Aún no tienes muñecas en tu Vitrina. Explora el catálogo para añadirlas.'}
+                {vitrinaSearchTerm ? 'No se encontraron coincidencias en tu vitrina.' : 'Aún no tienes muñecas en tu Vitrina. Explora el Catálogo Maestro para añadirlas.'}
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -1010,7 +1019,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
           </section>
         )}
 
-        {/* TAB: CATÁLOGO MAESTRO */}
+        {/* TAB: CATÁLOGO MAESTRO (COMPARTIDO GLOBALMENTE) */}
         {activeTab === 'catalog' && (
           <section>
             {/* BARRA DE BÚSQUEDA Y FILTROS FLOTANTES (STICKY) */}
