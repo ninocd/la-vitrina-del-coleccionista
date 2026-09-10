@@ -41,10 +41,11 @@ export default function App() {
   const [myCollection, setMyCollection] = useState([]);
   const [wishlist, setWishlist] = useState([]);
 
-  // Interfaz móvil / pública
+  // Interfaz móvil / pública / scroll
   const [showMobileMetrics, setShowMobileMetrics] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   // INSPECTOR DE VITRINA Y ESTADO DE PUERTAS CON ZOOM INTERACTIVO
   const [showVitrinaDoorsModal, setShowVitrinaDoorsModal] = useState(false);
@@ -88,6 +89,18 @@ export default function App() {
   // Moneda
   const [currency, setCurrency] = useState('EUR');
   const exchangeRateUSD = 1.08;
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 250) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     if (!supabase) {
@@ -173,6 +186,10 @@ export default function App() {
       setLoading(false);
     }
   }
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const totalCollectionValueEUR = myCollection.reduce((acc, item) => {
     const qty = item.quantity || 1;
@@ -426,7 +443,7 @@ export default function App() {
     setActiveTab('vitrina');
   };
 
-  // ESCÁNER IA CON FONDO BLANCO PURO Y COMPRESIÓN ULTRARRÁPIDA
+  // ESCÁNER IA CON APLICACIÓN DE FONDO BLANCO PERMANENTE
   const handleScanImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -448,13 +465,14 @@ export default function App() {
 
         const ctx = canvas.getContext('2d');
         
-        // DIBUJAR FONDO BLANCO PURO ANTES DE COLOCAR LA FOTO
+        // PINTAR FONDO BLANCO PURO SÓLIDO (#FFFFFF)
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Renderizar la imagen escaneada sobre el fondo blanco
+        // Renderizar foto sobre el fondo blanco
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
+        // Generar Base64 JPEG que incluye el fondo blanco de forma permanente
         const fullBase64 = canvas.toDataURL('image/jpeg', 0.5);
         setScannedImageBase64(fullBase64);
         const base64Data = fullBase64.split(',')[1];
@@ -555,7 +573,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
   });
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 font-sans pb-24 pt-2">
+    <div className="min-h-screen bg-gray-950 text-gray-100 font-sans pb-24 pt-2 relative">
       
       {/* CABECERA MÓVIL */}
       <header className="bg-gray-900/90 border-b border-pink-900/40 px-3 py-2 sticky top-0 z-40 backdrop-blur-md">
@@ -633,35 +651,35 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                 {myCollection.map((item) => (
                   <div key={item.userInstanceId || item.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between group relative">
                     <div>
-                      {/* CAJA DE VITRINA 3D */}
+                      {/* CAJA DE VITRINA 3D CON FONDO BLANCO */}
                       <div 
                         onClick={() => handleOpenVitrinaDoll(item)}
-                        className="h-44 bg-gradient-to-b from-pink-950/30 via-black to-gray-950 p-2 flex items-center justify-center relative cursor-pointer overflow-hidden border-b border-gray-800"
+                        className="h-44 bg-white p-2 flex items-center justify-center relative cursor-pointer overflow-hidden border-b border-gray-800"
                         style={{ perspective: '600px' }}
                       >
-                        <div className="absolute top-0 w-24 h-24 bg-pink-500/20 rounded-full blur-lg pointer-events-none"></div>
+                        <div className="absolute top-0 w-24 h-24 bg-pink-500/10 rounded-full blur-lg pointer-events-none"></div>
 
                         {item.image_url ? (
-                          <img src={item.image_url} alt={item.name} className="max-h-full object-contain rounded-md transition duration-500 group-hover:scale-105 filter drop-shadow-[0_4px_6px_rgba(236,72,153,0.3)] z-10" />
+                          <img src={item.image_url} alt={item.name} className="max-h-full object-contain rounded-md transition duration-500 group-hover:scale-105 filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.15)] z-10" />
                         ) : (
                           <BarbieSilhouetteFallback />
                         )}
 
-                        <div className="absolute bottom-2 w-3/4 h-1 bg-gradient-to-r from-transparent via-pink-400/40 to-transparent rounded-full blur-[1px]"></div>
+                        <div className="absolute bottom-2 w-3/4 h-1 bg-gradient-to-r from-transparent via-pink-400/30 to-transparent rounded-full blur-[1px]"></div>
 
                         {/* PUERTAS DE CRISTAL INTERACTIVAS */}
                         <div 
-                          className="absolute top-0 left-0 w-1/2 h-full bg-pink-400/10 border-r border-white/40 backdrop-blur-[1px] transition-transform duration-500 ease-in-out origin-left flex items-center justify-end pr-1 pointer-events-none z-20 group-hover:-rotate-y-100"
+                          className="absolute top-0 left-0 w-1/2 h-full bg-pink-400/10 border-r border-gray-300/40 backdrop-blur-[1px] transition-transform duration-500 ease-in-out origin-left flex items-center justify-end pr-1 pointer-events-none z-20 group-hover:-rotate-y-100"
                           style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
                         >
-                          <div className="w-1 h-8 bg-white/40 rounded-full shadow"></div>
+                          <div className="w-1 h-8 bg-gray-400/50 rounded-full shadow"></div>
                         </div>
 
                         <div 
-                          className="absolute top-0 right-0 w-1/2 h-full bg-pink-400/10 border-l border-white/40 backdrop-blur-[1px] transition-transform duration-500 ease-in-out origin-right flex items-center justify-start pl-1 pointer-events-none z-20 group-hover:rotate-y-100"
+                          className="absolute top-0 right-0 w-1/2 h-full bg-pink-400/10 border-l border-gray-300/40 backdrop-blur-[1px] transition-transform duration-500 ease-in-out origin-right flex items-center justify-start pl-1 pointer-events-none z-20 group-hover:rotate-y-100"
                           style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
                         >
-                          <div className="w-1 h-8 bg-white/40 rounded-full shadow"></div>
+                          <div className="w-1 h-8 bg-gray-400/50 rounded-full shadow"></div>
                         </div>
 
                         <span className="absolute top-1.5 left-1.5 bg-gray-900/90 text-gray-300 text-[8px] px-1.5 py-0.5 rounded font-bold z-30">
@@ -793,7 +811,8 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         {/* TAB: CATÁLOGO MAESTRO */}
         {activeTab === 'catalog' && (
           <section>
-            <div className="bg-gray-900 p-2.5 rounded-xl mb-3 border border-pink-900/40 flex flex-col gap-2">
+            {/* BARRA DE BÚSQUEDA Y FILTROS FLOTANTES (STICKY) SIN INTERFERIR */}
+            <div className="sticky top-12 z-30 bg-gray-900/95 backdrop-blur-md p-2.5 rounded-xl mb-3 border border-pink-900/40 flex flex-col gap-2 shadow-lg">
               <input
                 type="text"
                 placeholder="🔍 Buscar Barbie o línea..."
@@ -826,9 +845,10 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                   return (
                     <div key={barbie.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between">
                       <div>
-                        <div className="h-40 bg-gray-950 p-2 flex items-center justify-center relative">
+                        {/* CONTENEDOR CON FONDO BLANCO PURO */}
+                        <div className="h-40 bg-white p-2 flex items-center justify-center relative">
                           {barbie.image_url ? (
-                            <img src={barbie.image_url} alt={barbie.name} className="max-h-full object-contain rounded-md" />
+                            <img src={barbie.image_url} alt={barbie.name} className="max-h-full object-contain rounded-md filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)]" />
                           ) : (
                             <BarbieSilhouetteFallback />
                           )}
@@ -951,6 +971,17 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
       </main>
 
+      {/* BOTÓN FLOTANTE "VOLVER ARRIBA" */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-16 right-4 bg-pink-600 hover:bg-pink-500 text-white text-xs font-black px-3 py-2 rounded-full shadow-2xl border border-pink-400/40 z-40 transition-all transform hover:scale-110 flex items-center gap-1 animate-bounce"
+          title="Volver arriba"
+        >
+          🚀 Arriba
+        </button>
+      )}
+
       {/* MODAL 3D CON CONTROLES DE ZOOM E INSPECTOR DE VITRINA */}
       {showVitrinaDoorsModal && selectedVitrinaDoll && (
         <div 
@@ -1000,10 +1031,10 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
-              className={`relative w-full h-64 bg-gradient-to-b from-pink-950/40 via-black to-gray-950 rounded-xl overflow-hidden border border-pink-500/30 flex items-center justify-center mb-3 shrink-0 ${zoomScale > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+              className={`relative w-full h-64 bg-white rounded-xl overflow-hidden border border-pink-500/30 flex items-center justify-center mb-3 shrink-0 ${zoomScale > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
               style={{ perspective: '900px' }}
             >
-              <div className="absolute top-0 w-28 h-28 bg-pink-500/25 rounded-full blur-xl pointer-events-none"></div>
+              <div className="absolute top-0 w-28 h-28 bg-pink-500/10 rounded-full blur-xl pointer-events-none"></div>
 
               <div 
                 className="z-10 h-56 p-1 flex items-center justify-center transition-transform duration-150 ease-out"
@@ -1015,36 +1046,36 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                   <img 
                     src={selectedVitrinaDoll.image_url} 
                     alt={selectedVitrinaDoll.name} 
-                    className="max-h-full object-contain filter drop-shadow-[0_8px_8px_rgba(236,72,153,0.35)] select-none pointer-events-none" 
+                    className="max-h-full object-contain filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.15)] select-none pointer-events-none" 
                   />
                 ) : (
                   <BarbieSilhouetteFallback />
                 )}
               </div>
 
-              <div className="absolute bottom-3 w-3/4 h-1.5 bg-gradient-to-r from-transparent via-pink-400/50 to-transparent rounded-full blur-[1px]"></div>
+              <div className="absolute bottom-3 w-3/4 h-1.5 bg-gradient-to-r from-transparent via-pink-400/30 to-transparent rounded-full blur-[1px]"></div>
 
               {/* PUERTAS DE CRISTAL INTERACTIVAS */}
               <div 
-                className="absolute top-0 left-0 w-1/2 h-full bg-pink-400/10 border-r border-white/40 backdrop-blur-[2px] transition-transform duration-500 ease-in-out origin-left flex items-center justify-end pr-1.5 pointer-events-none z-20"
+                className="absolute top-0 left-0 w-1/2 h-full bg-pink-400/10 border-r border-gray-300/40 backdrop-blur-[2px] transition-transform duration-500 ease-in-out origin-left flex items-center justify-end pr-1.5 pointer-events-none z-20"
                 style={{ 
                   transform: doorsOpened ? 'rotateY(-110deg)' : 'rotateY(0deg)',
                   transformStyle: 'preserve-3d',
                   backfaceVisibility: 'hidden'
                 }}
               >
-                <div className="w-1 h-10 bg-white/50 rounded-full shadow-md"></div>
+                <div className="w-1 h-10 bg-gray-400/50 rounded-full shadow-md"></div>
               </div>
 
               <div 
-                className="absolute top-0 right-0 w-1/2 h-full bg-pink-400/10 border-l border-white/40 backdrop-blur-[2px] transition-transform duration-500 ease-in-out origin-right flex items-center justify-start pl-1.5 pointer-events-none z-20"
+                className="absolute top-0 right-0 w-1/2 h-full bg-pink-400/10 border-l border-gray-300/40 backdrop-blur-[2px] transition-transform duration-500 ease-in-out origin-right flex items-center justify-start pl-1.5 pointer-events-none z-20"
                 style={{ 
                   transform: doorsOpened ? 'rotateY(110deg)' : 'rotateY(0deg)',
                   transformStyle: 'preserve-3d',
                   backfaceVisibility: 'hidden'
                 }}
               >
-                <div className="w-1 h-10 bg-white/50 rounded-full shadow-md"></div>
+                <div className="w-1 h-10 bg-gray-400/50 rounded-full shadow-md"></div>
               </div>
             </div>
 
