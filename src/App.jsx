@@ -388,7 +388,6 @@ export default function App() {
     setActiveTab('vitrina');
   };
 
-  // ESCÁNER IA ULTRA COMPRIMIDO (REDUCCIÓN A 600px / COMPRESIÓN 0.5 JPEG PARA RESPUESTA EN 2s)
   const handleScanImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -403,7 +402,7 @@ export default function App() {
       
       img.onload = async () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 600; // Ancho óptimo ultrarrápido
+        const MAX_WIDTH = 600;
         const scale = MAX_WIDTH / img.width;
         canvas.width = MAX_WIDTH;
         canvas.height = img.height * scale;
@@ -411,7 +410,6 @@ export default function App() {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        // Compresión optimizada al 50% para envío ultraligero (<100KB)
         const fullBase64 = canvas.toDataURL('image/jpeg', 0.5);
         setScannedImageBase64(fullBase64);
         const base64Data = fullBase64.split(',')[1];
@@ -691,8 +689,14 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
             <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-700 rounded-xl p-4 bg-gray-950">
               <label className="bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold px-5 py-2.5 rounded-xl cursor-pointer transition shadow-lg shadow-pink-600/30">
-                📷 Seleccionar Imagen / Cámara
-                <input type="file" accept="image/*" onChange={handleScanImage} className="hidden" />
+                📷 Tomar Foto con la Cámara
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  capture="environment" 
+                  onChange={handleScanImage} 
+                  className="hidden" 
+                />
               </label>
 
               {scannedImageBase64 && (
