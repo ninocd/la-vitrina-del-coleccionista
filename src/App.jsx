@@ -196,13 +196,15 @@ export default function App() {
             ...matchedMaster,
             ...item,
             userInstanceId: item.id,
+            barbie_id: item.barbie_id || matchedMaster.id,
             name: matchedMaster.name || item.name || 'Barbie Colección',
             collection_line: matchedMaster.collection_line || item.collection_line || 'Mattel',
             release_year: matchedMaster.release_year || item.release_year || 2000,
             estimated_min_price: matchedMaster.estimated_min_price || item.estimated_min_price || 35,
             lore: matchedMaster.lore || item.lore || getBarbieLoreFallback(matchedMaster.name, matchedMaster.collection_line, matchedMaster.release_year),
             image_url: matchedMaster.image_url || item.image_url || null,
-            condition: item.condition || 'NIB'
+            condition: item.condition || 'NIB',
+            quantity: Number(item.quantity) || 1
           };
         });
 
@@ -279,7 +281,6 @@ export default function App() {
         setAuthPassword('');
       }
     } else {
-      // VERIFICACIÓN DEL LÍMITE DE 50 PROBADORES
       try {
         const { count, error: countErr } = await supabase
           .from('user_collection')
@@ -327,11 +328,20 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // VALOR TOTAL CONSIDERANDO UNIDADES REPETIDAS
   const totalCollectionValueEUR = myCollection.reduce((acc, item) => {
-    const qty = item.quantity || 1;
-    const price = item.estimated_min_price || 0;
+    const qty = Number(item.quantity) || 1;
+    const price = Number(item.estimated_min_price) || 0;
     return acc + (price * qty);
   }, 0);
+
+  const totalDollsCount = myCollection.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
+
+  // OBTENER CUÁNTAS UNIDADES DE UNA BARBIE ESPECÍFICA TIENE EL USUARIO
+  const getInVitrinaCount = (masterId) => {
+    const items = myCollection.filter(item => (item.barbie_id === masterId || item.id === masterId));
+    return items.reduce((acc, curr) => acc + (Number(curr.quantity) || 1), 0);
+  };
 
   const toggleWishlist = (barbie) => {
     setWishlist(prev => {
@@ -465,7 +475,7 @@ export default function App() {
   };
 
   const handleDeleteFromVitrina = async (userInstanceId) => {
-    if (!window.confirm("¿Seguro que deseas quitar esta Barbie de tu vitrina?")) return;
+    if (!window.confirm("¿Seguro que deseas quitar esta unidad de tu vitrina?")) return;
 
     if (supabase) {
       const { error } = await supabase
@@ -546,18 +556,20 @@ export default function App() {
     setActiveTab('catalog');
   };
 
+  // AÑADIR A MI VITRINA (AUMENTAR REPETIDAS O REGISTRAR NUEVA UNIDAD)
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie) return;
 
     const barbieSource = activeModal.barbie;
     const condClean = userBarbieForm.condition ? userBarbieForm.condition.split(' ')[0] : 'NIB';
+    const addQty = Math.max(1, Number(userBarbieForm.quantity || 1));
 
     if (supabase && session?.user?.id) {
       const payload = {
         user_id: session.user.id,
         barbie_id: barbieSource.id,
-        quantity: Math.max(1, Number(userBarbieForm.quantity || 1)),
+        quantity: addQty,
         condition: condClean
       };
 
@@ -571,10 +583,17 @@ export default function App() {
         await fetchData(session.user.id);
       }
     } else {
-      setMyCollection(prev => [...prev, { ...barbieSource, userInstanceId: Date.now(), quantity: 1, condition: condClean }]);
+      setMyCollection(prev => [...prev, { 
+        ...barbieSource, 
+        userInstanceId: Date.now(), 
+        barbie_id: barbieSource.id,
+        quantity: addQty, 
+        condition: condClean 
+      }]);
     }
 
     setActiveModal(null);
+    setUserBarbieForm({ quantity: 1, condition: 'NFRB (Caja Original Precintada)' });
     setActiveTab('vitrina');
   };
 
@@ -689,7 +708,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
   const getShareText = () => {
     return `Te invito a explorar mi colección oficial de Barbie en La Vitrina.\n\n` +
-      `✦ Piezas catalogadas: ${myCollection.length}\n` +
+      `✦ Piezas catalogadas: ${totalDollsCount}\n` +
       `✦ Valor estimado: ${totalCollectionValueEUR.toLocaleString()} €\n\n` +
       `Ver colección: ${getPublicVitrinaUrl()}`;
   };
@@ -865,7 +884,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
             </div>
             <div className="bg-gray-950 p-2 rounded-lg border border-gray-800">
               <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">En Vitrina</p>
-              <p className="font-extrabold text-white mt-0.5">{myCollection.length} uds.</p>
+              <p className="font-extrabold text-white mt-0.5">{totalDollsCount} uds.</p>
             </div>
             <div className="bg-gray-950 p-2 rounded-lg border border-gray-800">
               <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Deseadas</p>
@@ -909,94 +928,108 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                {filteredMyCollection.map((item) => (
-                  <div key={item.userInstanceId || item.id} className="bg-gray-900/90 border border-gray-800/90 rounded-xl overflow-hidden flex flex-col justify-between group relative">
-                    <div>
-                      <div 
-                        onClick={() => handleOpenVitrinaDoll(item)}
-                        className="h-44 bg-white p-2 flex items-center justify-center relative cursor-pointer overflow-hidden border-b border-gray-800/80"
-                        style={{ perspective: '600px' }}
-                      >
-                        <div className="absolute top-0 w-24 h-24 bg-pink-500/10 rounded-full blur-lg pointer-events-none"></div>
-
-                        {item.image_url ? (
-                          <img src={item.image_url} alt={item.name} className="max-h-full object-contain rounded-md transition duration-500 group-hover:scale-105 filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.15)] z-10" />
-                        ) : (
-                          <BarbieSilhouetteFallback />
-                        )}
-
-                        <div className="absolute bottom-2 w-3/4 h-1 bg-gradient-to-r from-transparent via-pink-400/30 to-transparent rounded-full blur-[1px]"></div>
-
+                {filteredMyCollection.map((item) => {
+                  const qty = Number(item.quantity) || 1;
+                  return (
+                    <div key={item.userInstanceId || item.id} className="bg-gray-900/90 border border-gray-800/90 rounded-xl overflow-hidden flex flex-col justify-between group relative">
+                      <div>
                         <div 
-                          className="absolute top-0 left-0 w-1/2 h-full bg-pink-400/10 border-r border-gray-300/40 backdrop-blur-[1px] transition-transform duration-500 ease-in-out origin-left flex items-center justify-end pr-1 pointer-events-none z-20 group-hover:-rotate-y-100"
-                          style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
+                          onClick={() => handleOpenVitrinaDoll(item)}
+                          className="h-44 bg-white p-2 flex items-center justify-center relative cursor-pointer overflow-hidden border-b border-gray-800/80"
+                          style={{ perspective: '600px' }}
                         >
-                          <div className="w-1 h-8 bg-gray-400/50 rounded-full shadow"></div>
+                          <div className="absolute top-0 w-24 h-24 bg-pink-500/10 rounded-full blur-lg pointer-events-none"></div>
+
+                          {item.image_url ? (
+                            <img src={item.image_url} alt={item.name} className="max-h-full object-contain rounded-md transition duration-500 group-hover:scale-105 filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.15)] z-10" />
+                          ) : (
+                            <BarbieSilhouetteFallback />
+                          )}
+
+                          <div className="absolute bottom-2 w-3/4 h-1 bg-gradient-to-r from-transparent via-pink-400/30 to-transparent rounded-full blur-[1px]"></div>
+
+                          <div 
+                            className="absolute top-0 left-0 w-1/2 h-full bg-pink-400/10 border-r border-gray-300/40 backdrop-blur-[1px] transition-transform duration-500 ease-in-out origin-left flex items-center justify-end pr-1 pointer-events-none z-20 group-hover:-rotate-y-100"
+                            style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
+                          >
+                            <div className="w-1 h-8 bg-gray-400/50 rounded-full shadow"></div>
+                          </div>
+
+                          <div 
+                            className="absolute top-0 right-0 w-1/2 h-full bg-pink-400/10 border-l border-gray-300/40 backdrop-blur-[1px] transition-transform duration-500 ease-in-out origin-right flex items-center justify-start pl-1 pointer-events-none z-20 group-hover:rotate-y-100"
+                            style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
+                          >
+                            <div className="w-1 h-8 bg-gray-400/50 rounded-full shadow"></div>
+                          </div>
+
+                          <span className="absolute top-1.5 left-1.5 bg-gray-900/90 text-gray-300 text-[8px] px-1.5 py-0.5 rounded font-bold z-30 tracking-wider">
+                            {item.condition || 'NIB'}
+                          </span>
+
+                          {qty > 1 && (
+                            <span className="absolute top-1.5 right-1.5 bg-pink-600 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black z-30 shadow-md border border-pink-400">
+                              x{qty}
+                            </span>
+                          )}
                         </div>
 
-                        <div 
-                          className="absolute top-0 right-0 w-1/2 h-full bg-pink-400/10 border-l border-gray-300/40 backdrop-blur-[1px] transition-transform duration-500 ease-in-out origin-right flex items-center justify-start pl-1 pointer-events-none z-20 group-hover:rotate-y-100"
-                          style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
-                        >
-                          <div className="w-1 h-8 bg-gray-400/50 rounded-full shadow"></div>
+                        <div className="p-2.5">
+                          <p className="text-[9px] text-pink-400 font-bold uppercase truncate tracking-wider">{item.collection_line}</p>
+                          <h3 
+                            onClick={() => handleOpenVitrinaDoll(item)}
+                            className="font-bold text-xs text-white leading-tight line-clamp-1 cursor-pointer hover:text-pink-400 transition"
+                          >
+                            {item.name}
+                          </h3>
+                          <p 
+                            onClick={() => handleOpenVitrinaDoll(item)}
+                            className="text-[10px] text-gray-400 mt-1 line-clamp-2 cursor-pointer hover:text-gray-200"
+                          >
+                            {item.lore}
+                          </p>
                         </div>
-
-                        <span className="absolute top-1.5 left-1.5 bg-gray-900/90 text-gray-300 text-[8px] px-1.5 py-0.5 rounded font-bold z-30 tracking-wider">
-                          {item.condition || 'NIB'}
-                        </span>
                       </div>
-
-                      <div className="p-2.5">
-                        <p className="text-[9px] text-pink-400 font-bold uppercase truncate tracking-wider">{item.collection_line}</p>
-                        <h3 
-                          onClick={() => handleOpenVitrinaDoll(item)}
-                          className="font-bold text-xs text-white leading-tight line-clamp-1 cursor-pointer hover:text-pink-400 transition"
-                        >
-                          {item.name}
-                        </h3>
-                        <p 
-                          onClick={() => handleOpenVitrinaDoll(item)}
-                          className="text-[10px] text-gray-400 mt-1 line-clamp-2 cursor-pointer hover:text-gray-200"
-                        >
-                          {item.lore}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="p-2 border-t border-gray-800/80 bg-gray-950/80 flex items-center justify-between">
-                      <span className="text-pink-400 font-extrabold text-xs">{item.estimated_min_price} €</span>
-                      <div className="flex gap-1">
-                        <button 
-                          onClick={() => handleOpenEditPrice(item)}
-                          className="bg-gray-800 text-yellow-400 text-[10px] p-1.5 rounded hover:bg-gray-700 transition"
-                          title="Cambiar Precio"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </button>
-                        <button 
-                          onClick={() => handleOpenEditLore(item)}
-                          className="bg-gray-800 text-gray-300 text-[10px] p-1.5 rounded hover:bg-gray-700 transition"
-                          title="Editar Nombre e Historia"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteFromVitrina(item.userInstanceId)}
-                          className="bg-red-950/60 text-red-400 border border-red-900/50 text-[10px] p-1.5 rounded hover:bg-red-900/80 transition"
-                          title="Eliminar de Mi Vitrina"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
+                      
+                      <div className="p-2 border-t border-gray-800/80 bg-gray-950/80 flex items-center justify-between">
+                        <div>
+                          <span className="text-pink-400 font-extrabold text-xs">{item.estimated_min_price} €</span>
+                          {qty > 1 && (
+                            <p className="text-[8px] text-gray-500 font-semibold">Total: {item.estimated_min_price * qty} €</p>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
+                          <button 
+                            onClick={() => handleOpenEditPrice(item)}
+                            className="bg-gray-800 text-yellow-400 text-[10px] p-1.5 rounded hover:bg-gray-700 transition"
+                            title="Cambiar Precio"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </button>
+                          <button 
+                            onClick={() => handleOpenEditLore(item)}
+                            className="bg-gray-800 text-gray-300 text-[10px] p-1.5 rounded hover:bg-gray-700 transition"
+                            title="Editar Nombre e Historia"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteFromVitrina(item.userInstanceId)}
+                            className="bg-red-950/60 text-red-400 border border-red-900/50 text-[10px] p-1.5 rounded hover:bg-red-900/80 transition"
+                            title="Eliminar de Mi Vitrina"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -1114,6 +1147,8 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {filteredMasterCatalog.map((barbie) => {
                   const isWishlisted = wishlist.some(item => item.id === barbie.id);
+                  const inVitrinaQty = getInVitrinaCount(barbie.id);
+
                   return (
                     <div key={barbie.id} className="bg-gray-900 border border-gray-800/90 rounded-xl overflow-hidden flex flex-col justify-between">
                       <div>
@@ -1150,6 +1185,15 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                             Mercados
                           </button>
                         </div>
+
+                        {/* INDICADOR DE SI YA ESTÁ EN TU VITRINA */}
+                        {inVitrinaQty > 0 && (
+                          <div className="bg-pink-950/70 border border-pink-700/50 rounded px-2 py-0.5 text-center text-[9px] text-pink-300 font-semibold flex items-center justify-between">
+                            <span>✓ En tu Vitrina</span>
+                            <span className="font-extrabold text-pink-400">({inVitrinaQty})</span>
+                          </div>
+                        )}
+
                         <div className="flex gap-1">
                           <button 
                             onClick={() => handleOpenEditPrice(barbie)}
@@ -1180,10 +1224,10 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                           </button>
                           <button 
                             onClick={() => setActiveModal({ type: 'add_to_vitrina', barbie })}
-                            className="bg-pink-600 text-white text-[11px] font-bold py-1 rounded w-1/4 hover:bg-pink-500 flex items-center justify-center transition"
-                            title="Añadir a Vitrina"
+                            className={`text-white text-[10px] font-bold py-1 rounded w-1/4 hover:opacity-90 flex items-center justify-center transition ${inVitrinaQty > 0 ? 'bg-pink-700' : 'bg-pink-600'}`}
+                            title={inVitrinaQty > 0 ? "Agregar otra unidad repetida" : "Añadir a Mi Vitrina"}
                           >
-                            +
+                            {inVitrinaQty > 0 ? '+1' : '+'}
                           </button>
                         </div>
                       </div>
@@ -1208,10 +1252,10 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                 {myCollection.map((item) => (
                   <div key={item.userInstanceId || item.id} className="bg-gray-950 p-3 rounded-lg border border-gray-800 text-xs">
                     <h3 className="font-bold text-white">{item.name}</h3>
-                    <p className="text-[10px] text-pink-400">{item.collection_line} ({item.release_year})</p>
+                    <p className="text-[10px] text-pink-400">{item.collection_line} ({item.release_year}) - Unidades: {item.quantity || 1}</p>
 
                     <button 
-                      onClick={() => navigator.clipboard.writeText(`Barbie ${item.name} (${item.release_year}) - Estado: ${item.condition}. ${item.lore}`)}
+                      onClick={() => navigator.clipboard.writeText(`Barbie ${item.name} (${item.release_year}) - Unidades disponibles: ${item.quantity || 1} - Estado: ${item.condition}. ${item.lore}`)}
                       className="mt-2.5 w-full bg-pink-600 hover:bg-pink-500 text-white text-[11px] font-bold py-1.5 rounded transition flex items-center justify-center gap-1.5"
                     >
                       Copiar Anuncio Optimizado
@@ -1435,7 +1479,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               <p className="text-[10px] text-gray-300 mt-1 leading-relaxed">{selectedVitrinaDoll.lore}</p>
               
               <div className="mt-2 pt-2 border-t border-gray-800 flex justify-between items-center text-[11px]">
-                <span className="text-gray-400">Estado: <strong className="text-white">{selectedVitrinaDoll.condition || 'NIB'}</strong></span>
+                <span className="text-gray-400">Unidades: <strong className="text-white">{selectedVitrinaDoll.quantity || 1} ({selectedVitrinaDoll.condition || 'NIB'})</strong></span>
                 <span className="text-pink-400 font-extrabold">{selectedVitrinaDoll.estimated_min_price} €</span>
               </div>
             </div>
@@ -1684,14 +1728,33 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         </div>
       )}
 
-      {/* MODAL: CONFIRMAR REGISTRO A MI VITRINA */}
+      {/* MODAL: CONFIRMAR REGISTRO O UNIDADES REPETIDAS A MI VITRINA */}
       {activeModal?.type === 'add_to_vitrina' && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-xs w-full">
             <h3 className="text-sm font-bold text-pink-500 mb-1">Añadir a Mi Vitrina</h3>
             <p className="text-[10px] text-gray-400 mb-3">{activeModal.barbie.name}</p>
 
+            {getInVitrinaCount(activeModal.barbie.id) > 0 && (
+              <div className="mb-3 p-2 bg-pink-950/80 border border-pink-800/80 text-pink-300 text-[10px] rounded-lg font-medium">
+                ⓘ Ya posees esta Barbie en tu vitrina. Puedes aumentar el número de unidades repetidas o registrar otra con un estado de conservación distinto.
+              </div>
+            )}
+
             <form onSubmit={handleAddToMyVitrina} className="space-y-3 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Cantidad de Unidades:</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={userBarbieForm.quantity}
+                  onChange={(e) => setUserBarbieForm({ ...userBarbieForm, quantity: Math.max(1, Number(e.target.value)) })}
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded p-1.5 text-xs focus:outline-none focus:border-pink-500"
+                  required
+                />
+              </div>
+
               <div>
                 <label className="text-[10px] font-bold text-gray-300 block mb-0.5">Estado de Conservación:</label>
                 <select
@@ -1717,7 +1780,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                   type="submit"
                   className="bg-pink-600 text-white px-3 py-1.5 rounded font-bold"
                 >
-                  Confirmar
+                  {getInVitrinaCount(activeModal.barbie.id) > 0 ? 'Añadir Unidades' : 'Confirmar'}
                 </button>
               </div>
             </form>
