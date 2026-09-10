@@ -46,10 +46,14 @@ export default function App() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // INSPECTOR DE VITRINA Y ESTADO DE PUERTAS
+  // INSPECTOR DE VITRINA Y ESTADO DE PUERTAS CON ZOOM INTERACTIVO
   const [showVitrinaDoorsModal, setShowVitrinaDoorsModal] = useState(false);
   const [doorsOpened, setDoorsOpened] = useState(false);
   const [selectedVitrinaDoll, setSelectedVitrinaDoll] = useState(null);
+  const [zoomScale, setZoomScale] = useState(1);
+  const [zoomPosition, setZoomPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // Perfiles de Coleccionistas Reales
   const betaTesters = [
@@ -186,6 +190,8 @@ export default function App() {
 
   const handleOpenVitrinaDoll = (barbie) => {
     setSelectedVitrinaDoll(barbie);
+    setZoomScale(1);
+    setZoomPosition({ x: 0, y: 0 });
     setDoorsOpened(false);
     setShowVitrinaDoorsModal(true);
     setTimeout(() => {
@@ -198,8 +204,40 @@ export default function App() {
     setTimeout(() => {
       setShowVitrinaDoorsModal(false);
       setSelectedVitrinaDoll(null);
+      setZoomScale(1);
+      setZoomPosition({ x: 0, y: 0 });
     }, 450);
   };
+
+  // FUNCIONES DE CONTROL DE ZOOM E INTERACCIÓN
+  const handleZoomIn = () => setZoomScale(prev => Math.min(prev + 0.5, 3));
+  const handleZoomOut = () => {
+    setZoomScale(prev => {
+      const next = Math.max(prev - 0.5, 1);
+      if (next === 1) setZoomPosition({ x: 0, y: 0 });
+      return next;
+    });
+  };
+  const handleResetZoom = () => {
+    setZoomScale(1);
+    setZoomPosition({ x: 0, y: 0 });
+  };
+
+  const handleMouseDown = (e) => {
+    if (zoomScale <= 1) return;
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - zoomPosition.x, y: e.clientY - zoomPosition.y });
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging || zoomScale <= 1) return;
+    setZoomPosition({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y
+    });
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
 
   const handleOpenEditLore = (barbie) => {
     setEditingLoreItem(barbie);
@@ -388,6 +426,7 @@ export default function App() {
     setActiveTab('vitrina');
   };
 
+  // ESCÁNER IA CON FONDO BLANCO PURO Y COMPRESIÓN ULTRARRÁPIDA
   const handleScanImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -408,6 +447,12 @@ export default function App() {
         canvas.height = img.height * scale;
 
         const ctx = canvas.getContext('2d');
+        
+        // DIBUJAR FONDO BLANCO PURO ANTES DE COLOCAR LA FOTO
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Renderizar la imagen escaneada sobre el fondo blanco
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
         const fullBase64 = canvas.toDataURL('image/jpeg', 0.5);
@@ -675,7 +720,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
           </section>
         )}
 
-        {/* TAB: ESCÁNER CON GUARDADO DIRECTO AL CATÁLOGO MAESTRO */}
+        {/* TAB: ESCÁNER CON GUARDADO DIRECTO AL CATÁLOGO MAESTRO Y FONDO BLANCO */}
         {activeTab === 'scan' && (
           <section className="max-w-md mx-auto bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl">
             <h2 className="text-base font-extrabold text-pink-500 text-center mb-1">Escáner de Catalogación IA</h2>
@@ -701,7 +746,8 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
               {scannedImageBase64 && (
                 <div className="mt-3 text-center">
-                  <img src={scannedImageBase64} alt="Captura" className="max-h-48 rounded-lg border border-gray-800 mx-auto" />
+                  <p className="text-[9px] text-gray-400 mb-1 font-bold">Vista previa (Fondo Blanco Aplicado):</p>
+                  <img src={scannedImageBase64} alt="Captura" className="max-h-48 rounded-lg border border-gray-800 mx-auto bg-white p-1" />
                 </div>
               )}
             </div>
@@ -905,7 +951,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
       </main>
 
-      {/* MODAL 3D: INSPECTOR DE VITRINA */}
+      {/* MODAL 3D CON CONTROLES DE ZOOM E INSPECTOR DE VITRINA */}
       {showVitrinaDoorsModal && selectedVitrinaDoll && (
         <div 
           onClick={handleCloseVitrinaDoll}
@@ -913,7 +959,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         >
           <div 
             onClick={(e) => e.stopPropagation()} 
-            className="relative w-full max-w-sm bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 border-2 border-pink-900/60 rounded-2xl overflow-hidden shadow-2xl p-3 my-auto max-h-[85vh] flex flex-col justify-between"
+            className="relative w-full max-w-sm bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 border-2 border-pink-900/60 rounded-2xl overflow-hidden shadow-2xl p-3 my-auto max-h-[88vh] flex flex-col justify-between"
           >
             <button 
               onClick={handleCloseVitrinaDoll}
@@ -922,15 +968,55 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               ✕
             </button>
 
+            {/* CONTROLES FLOTANTES DE ZOOM */}
+            <div className="absolute top-2 left-2 z-40 flex items-center gap-1 bg-gray-900/80 backdrop-blur-md border border-gray-700/80 p-1 rounded-lg shadow-md">
+              <button 
+                onClick={handleZoomIn} 
+                className="bg-gray-800 hover:bg-pink-600 text-white font-bold text-xs px-2 py-0.5 rounded transition"
+                title="Acercar (Zoom +)"
+              >
+                🔍+
+              </button>
+              <button 
+                onClick={handleZoomOut} 
+                className="bg-gray-800 hover:bg-pink-600 text-white font-bold text-xs px-2 py-0.5 rounded transition"
+                title="Alejar (Zoom -)"
+              >
+                🔍-
+              </button>
+              {zoomScale > 1 && (
+                <button 
+                  onClick={handleResetZoom} 
+                  className="bg-pink-950 text-pink-300 font-bold text-[9px] px-1.5 py-0.5 rounded border border-pink-700/50 hover:bg-pink-900 transition"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+
+            {/* MARCO DE EXHIBICIÓN DE FOTO CON LÓGICA DE ZOOM Y ARRASTRE */}
             <div 
-              className="relative w-full h-60 bg-gradient-to-b from-pink-950/40 via-black to-gray-950 rounded-xl overflow-hidden border border-pink-500/30 flex items-center justify-center mb-3 shrink-0"
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              className={`relative w-full h-64 bg-gradient-to-b from-pink-950/40 via-black to-gray-950 rounded-xl overflow-hidden border border-pink-500/30 flex items-center justify-center mb-3 shrink-0 ${zoomScale > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
               style={{ perspective: '900px' }}
             >
               <div className="absolute top-0 w-28 h-28 bg-pink-500/25 rounded-full blur-xl pointer-events-none"></div>
 
-              <div className="z-10 h-52 p-1 flex items-center justify-center">
+              <div 
+                className="z-10 h-56 p-1 flex items-center justify-center transition-transform duration-150 ease-out"
+                style={{
+                  transform: `scale(${zoomScale}) translate(${zoomPosition.x / zoomScale}px, ${zoomPosition.y / zoomScale}px)`
+                }}
+              >
                 {selectedVitrinaDoll.image_url ? (
-                  <img src={selectedVitrinaDoll.image_url} alt={selectedVitrinaDoll.name} className="max-h-full object-contain filter drop-shadow-[0_8px_8px_rgba(236,72,153,0.35)]" />
+                  <img 
+                    src={selectedVitrinaDoll.image_url} 
+                    alt={selectedVitrinaDoll.name} 
+                    className="max-h-full object-contain filter drop-shadow-[0_8px_8px_rgba(236,72,153,0.35)] select-none pointer-events-none" 
+                  />
                 ) : (
                   <BarbieSilhouetteFallback />
                 )}
@@ -938,6 +1024,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
               <div className="absolute bottom-3 w-3/4 h-1.5 bg-gradient-to-r from-transparent via-pink-400/50 to-transparent rounded-full blur-[1px]"></div>
 
+              {/* PUERTAS DE CRISTAL INTERACTIVAS */}
               <div 
                 className="absolute top-0 left-0 w-1/2 h-full bg-pink-400/10 border-r border-white/40 backdrop-blur-[2px] transition-transform duration-500 ease-in-out origin-left flex items-center justify-end pr-1.5 pointer-events-none z-20"
                 style={{ 
