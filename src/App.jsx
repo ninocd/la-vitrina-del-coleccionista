@@ -36,6 +36,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('vitrina');
 
+  // VISTA PÚBLICA / COMPARTIDA EN REDES
+  const [publicUserId, setPublicUserId] = useState(null);
+  const [publicCollection, setPublicCollection] = useState([]);
+
   // Estado Formulario de Autenticación
   const [authMode, setAuthMode] = useState('login');
   const [authEmail, setAuthEmail] = useState('');
@@ -43,6 +47,11 @@ export default function App() {
   const [authError, setAuthError] = useState(null);
   const [authMsg, setAuthMsg] = useState('');
   const [authSubmitting, setAuthSubmitting] = useState(false);
+
+  // Estado Perfil & Nombre de Usuario
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [profileMsg, setProfileMsg] = useState('');
 
   // Estado Cambio de Contraseña de Usuario
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -105,6 +114,16 @@ export default function App() {
   const [currency, setCurrency] = useState('EUR');
   const exchangeRateUSD = 1.08;
 
+  // DETECTAR VISTAS PÚBLICAS DESDE EL ENLACE COMPARTIDO EN REDES
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sharedUserId = params.get('vitrina');
+    if (sharedUserId) {
+      setPublicUserId(sharedUserId);
+      fetchPublicVitrina(sharedUserId);
+    }
+  }, []);
+
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 250) {
@@ -125,13 +144,16 @@ export default function App() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchData(session.user.id);
-      else setLoading(false);
+      if (session) {
+        setUsernameInput(session.user.user_metadata?.username || '');
+        fetchData(session.user.id);
+      } else setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
+        setUsernameInput(session.user.user_metadata?.username || '');
         fetchData(session.user.id);
       } else {
         setMyCollection([]);
@@ -141,6 +163,42 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // CARGAR VITRINA PÚBLICA PARA VISITANTES DE INSTAGRAM/REDES
+  async function fetchPublicVitrina(userId) {
+    if (!supabase) return;
+    setLoading(true);
+    try {
+      const { data: masterData } = await supabase.from('barbies_master').select('*');
+      const catalogMap = {};
+      (masterData || []).forEach(item => catalogMap[item.id] = item);
+
+      const { data: colData } = await supabase.from('user_collection').select('*').eq('user_id', userId);
+      if (colData) {
+        const publicItems = colData.map(item => {
+          const matched = catalogMap[item.barbie_id] || {};
+          return {
+            ...matched,
+            ...item,
+            userInstanceId: item.id,
+            name: matched.name || item.name || 'Barbie Colección',
+            collection_line: matched.collection_line || 'Mattel',
+            release_year: matched.release_year || 2000,
+            estimated_min_price: matched.estimated_min_price || 35,
+            lore: matched.lore || getBarbieLoreFallback(matched.name, matched.collection_line, matched.release_year),
+            image_url: matched.image_url || null,
+            condition: item.condition || 'NIB',
+            quantity: Number(item.quantity) || 1
+          };
+        });
+        setPublicCollection(publicItems);
+      }
+    } catch (e) {
+      console.error("Error cargando vitrina pública:", e);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function fetchData(userId) {
     setLoading(true);
@@ -217,6 +275,26 @@ export default function App() {
     }
   }
 
+  // CAMBIAR NOMBRE DE USUARIO / PERFIL
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    if (!supabase || !session) return;
+
+    const { error } = await supabase.auth.updateUser({
+      data: { username: usernameInput.trim() }
+    });
+
+    if (error) {
+      setProfileMsg(`Error: ${error.message}`);
+    } else {
+      setProfileMsg('¡Nombre de usuario actualizado!');
+      setTimeout(() => {
+        setShowProfileModal(false);
+        setProfileMsg('');
+      }, 1500);
+    }
+  };
+
   // MANEJO DE CAMBIO DE CONTRASEÑA EN SUPABASE
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
@@ -254,7 +332,7 @@ export default function App() {
     }
   };
 
-  // LOG IN / REGISTRO (CON LÍMITE DE 50 PROBADORES)
+  // LOG IN / REGISTRO
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     if (!supabase) {
@@ -328,16 +406,16 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // VALOR TOTAL CONSIDERANDO UNIDADES REPETIDAS
-  const totalCollectionValueEUR = myCollection.reduce((acc, item) => {
+  const activeCollection = publicUserId ? publicCollection : myCollection;
+
+  const totalCollectionValueEUR = activeCollection.reduce((acc, item) => {
     const qty = Number(item.quantity) || 1;
     const price = Number(item.estimated_min_price) || 0;
     return acc + (price * qty);
   }, 0);
 
-  const totalDollsCount = myCollection.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
+  const totalDollsCount = activeCollection.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0);
 
-  // OBTENER CUÁNTAS UNIDADES DE UNA BARBIE ESPECÍFICA TIENE EL USUARIO
   const getInVitrinaCount = (masterId) => {
     const items = myCollection.filter(item => (item.barbie_id === masterId || item.id === masterId));
     return items.reduce((acc, curr) => acc + (Number(curr.quantity) || 1), 0);
@@ -556,7 +634,6 @@ export default function App() {
     setActiveTab('catalog');
   };
 
-  // AÑADIR A MI VITRINA (AUMENTAR REPETIDAS O REGISTRAR NUEVA UNIDAD)
   const handleAddToMyVitrina = async (e) => {
     e.preventDefault();
     if (!activeModal?.barbie) return;
@@ -707,10 +784,12 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
   };
 
   const getShareText = () => {
-    return `Te invito a explorar mi colección oficial de Barbie en La Vitrina.\n\n` +
+    const displayName = session?.user?.user_metadata?.username || session?.user?.email?.split('@')[0] || 'Coleccionista';
+    return `¡Te invito a ver mi colección en La Vitrina de Barbie! 🎀\n\n` +
+      `✦ Coleccionista: ${displayName}\n` +
       `✦ Piezas catalogadas: ${totalDollsCount}\n` +
       `✦ Valor estimado: ${totalCollectionValueEUR.toLocaleString()} €\n\n` +
-      `Ver colección: ${getPublicVitrinaUrl()}`;
+      `Entra a ver mi vitrina aquí: ${getPublicVitrinaUrl()}`;
   };
 
   const handleCopyShareLink = () => {
@@ -719,7 +798,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  const filteredMyCollection = myCollection.filter((barbie) => {
+  const filteredMyCollection = activeCollection.filter((barbie) => {
     const nameMatch = (barbie.name || '').toLowerCase().includes(vitrinaSearchTerm.toLowerCase());
     const lineMatch = (barbie.collection_line || '').toLowerCase().includes(vitrinaSearchTerm.toLowerCase());
     return nameMatch || lineMatch;
@@ -739,6 +818,75 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
     return matchesSearch && matchesEra;
   });
+
+  // SI SE ENTRA A TRAVÉS DE UN ENLACE PÚBLICO
+  if (publicUserId && !session) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-gray-100 font-sans pb-24 pt-2">
+        <header className="bg-gray-900/90 border-b border-pink-900/30 px-3.5 py-2.5 sticky top-0 z-40 backdrop-blur-md flex justify-between items-center">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-gradient-to-tr from-pink-700 to-pink-500 text-white font-black rounded-lg w-8 h-8 flex items-center justify-center text-sm shadow-md shadow-pink-600/20">
+              V
+            </div>
+            <div>
+              <h1 className="text-xs font-black tracking-widest text-pink-500 uppercase leading-none">LA VITRINA</h1>
+              <p className="text-[9px] text-gray-400 font-medium tracking-wide leading-none mt-0.5">
+                Colección Pública Compartida
+              </p>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => setPublicUserId(null)}
+            className="bg-pink-600 hover:bg-pink-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow-md transition"
+          >
+            Crear mi Vitrina
+          </button>
+        </header>
+
+        <main className="max-w-7xl mx-auto px-3 mt-4">
+          <div className="bg-gradient-to-r from-gray-900 via-pink-950/30 to-gray-900 border border-pink-900/40 rounded-xl p-4 mb-4 text-center">
+            <span className="bg-pink-600 text-white text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider">Colección Verificada</span>
+            <h2 className="text-lg font-extrabold text-white mt-1">Exhibidor Digital de Coleccionista</h2>
+            <p className="text-xs text-gray-300 mt-1">
+              Piezas: <strong className="text-pink-400">{totalDollsCount} uds.</strong> | Valor Estimado: <strong className="text-pink-400">{totalCollectionValueEUR.toLocaleString()} €</strong>
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {filteredMyCollection.map((item) => (
+              <div key={item.userInstanceId || item.id} className="bg-gray-900/90 border border-gray-800/90 rounded-xl overflow-hidden flex flex-col justify-between">
+                <div>
+                  <div 
+                    onClick={() => handleOpenVitrinaDoll(item)}
+                    className="h-44 bg-white p-2 flex items-center justify-center relative cursor-pointer"
+                  >
+                    {item.image_url ? (
+                      <img src={item.image_url} alt={item.name} className="max-h-full object-contain rounded-md" />
+                    ) : (
+                      <BarbieSilhouetteFallback />
+                    )}
+                    <span className="absolute top-1.5 left-1.5 bg-gray-900/90 text-gray-300 text-[8px] px-1.5 py-0.5 rounded font-bold">
+                      {item.condition || 'NIB'}
+                    </span>
+                  </div>
+                  <div className="p-2.5">
+                    <p className="text-[9px] text-pink-400 font-bold uppercase truncate">{item.collection_line}</p>
+                    <h3 className="font-bold text-xs text-white leading-tight line-clamp-1">{item.name}</h3>
+                    <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{item.lore}</p>
+                  </div>
+                </div>
+                <div className="p-2 border-t border-gray-800/80 bg-gray-950/80 flex items-center justify-between">
+                  <span className="text-pink-400 font-extrabold text-xs">{item.estimated_min_price} €</span>
+                  <span className="text-[9px] text-gray-400">Cant: {item.quantity || 1}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   // PANTALLA DE LOG IN / REGISTRO SI NO HAY SESIÓN
   if (!session) {
@@ -839,17 +987,35 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
             <div>
               <h1 className="text-xs font-black tracking-widest text-pink-500 uppercase leading-none">LA VITRINA</h1>
               <p className="text-[9px] text-gray-400 font-medium tracking-wide leading-none mt-0.5 truncate max-w-[110px]">
-                {session?.user?.email?.split('@')[0]}
+                {session?.user?.user_metadata?.username || session?.user?.email?.split('@')[0]}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5">
+            {/* BOTÓN COMPARTIR VITRINA */}
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="bg-pink-600/90 hover:bg-pink-500 border border-pink-500 text-white text-[10px] px-2 py-1 rounded-lg font-extrabold flex items-center gap-1 transition shadow-md shadow-pink-600/20"
+              title="Compartir en Instagram / Redes"
+            >
+              <span>🔗 Compartir</span>
+            </button>
+
             <button
               onClick={() => setShowMobileMetrics(!showMobileMetrics)}
               className="bg-gray-800/80 border border-gray-700/80 text-pink-400 text-[11px] px-2 py-1 rounded-lg font-bold flex items-center gap-1 transition hover:bg-gray-800"
             >
               <span className="text-gray-400 font-normal">Valor:</span> {currency === 'EUR' ? `${totalCollectionValueEUR.toLocaleString()} €` : `${Math.round(totalCollectionValueEUR * exchangeRateUSD).toLocaleString()} $`}
+            </button>
+
+            {/* BOTÓN EDITAR PERFIL / USERNAME */}
+            <button
+              onClick={() => setShowProfileModal(true)}
+              className="bg-gray-800/80 border border-gray-700/80 text-pink-300 hover:text-white text-xs p-1.5 rounded-lg transition"
+              title="Editar Nombre de Usuario"
+            >
+              👤
             </button>
 
             {/* BOTÓN CAMBIAR CONTRASEÑA */}
@@ -1186,7 +1352,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                           </button>
                         </div>
 
-                        {/* INDICADOR DE SI YA ESTÁ EN TU VITRINA */}
                         {inVitrinaQty > 0 && (
                           <div className="bg-pink-950/70 border border-pink-700/50 rounded px-2 py-0.5 text-center text-[9px] text-pink-300 font-semibold flex items-center justify-between">
                             <span>✓ En tu Vitrina</span>
@@ -1303,6 +1468,61 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
           </svg>
           Subir
         </button>
+      )}
+
+      {/* MODAL EDITAR PERFIL / USERNAME */}
+      {showProfileModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-pink-900/50 rounded-2xl p-5 max-w-xs w-full relative shadow-2xl">
+            <button 
+              onClick={() => { setShowProfileModal(false); setProfileMsg(''); }}
+              className="absolute top-3 right-3 text-gray-400 hover:text-white font-bold text-xs"
+            >
+              ✕
+            </button>
+            
+            <h3 className="text-sm font-black text-pink-500 mb-1 flex items-center gap-1.5">
+              <span>👤</span> Mi Perfil de Coleccionista
+            </h3>
+            <p className="text-[10px] text-gray-400 mb-4">Personaliza el nombre que se mostrará en tu Vitrina pública.</p>
+
+            {profileMsg && (
+              <div className="mb-3 p-2 bg-pink-950/80 border border-pink-800 text-pink-300 text-[10px] rounded-lg text-center font-bold">
+                {profileMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveProfile} className="space-y-3 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-gray-300 block mb-1 uppercase tracking-wider">Nombre de Usuario (@):</label>
+                <input
+                  type="text"
+                  placeholder="ej. @barbie_collector"
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 text-white rounded-xl p-2.5 text-xs focus:outline-none focus:border-pink-500"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowProfileModal(false)}
+                  className="bg-gray-800 text-gray-300 px-3 py-2 rounded-xl font-bold text-xs hover:bg-gray-700 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="bg-pink-600 hover:bg-pink-500 text-white px-4 py-2 rounded-xl font-bold text-xs transition shadow-md"
+                >
+                  Guardar Nombre
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* MODAL CAMBIAR CONTRASEÑA */}
@@ -1693,8 +1913,8 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
             >
               ✕
             </button>
-            <h3 className="text-sm font-bold text-pink-500 mb-1">Compartir Vitrina</h3>
-            <p className="text-[11px] text-gray-400 mb-3">Enlace público a tu colección.</p>
+            <h3 className="text-sm font-bold text-pink-500 mb-1">Compartir mi Vitrina</h3>
+            <p className="text-[11px] text-gray-400 mb-3">Pública tu colección en Instagram, WhatsApp o X.</p>
 
             <div className="space-y-2 text-xs">
               <a
