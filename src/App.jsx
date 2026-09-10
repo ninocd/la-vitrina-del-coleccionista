@@ -36,6 +36,12 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('vitrina');
 
+  // Estado Formulario de Login
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState(null);
+  const [loggingIn, setLoggingIn] = useState(false);
+
   // Datos
   const [masterCatalog, setMasterCatalog] = useState([]);
   const [myCollection, setMyCollection] = useState([]);
@@ -111,13 +117,14 @@ export default function App() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session) fetchData();
+      else setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session) fetchData();
     });
-
-    fetchData();
 
     return () => subscription.unsubscribe();
   }, []);
@@ -187,6 +194,39 @@ export default function App() {
       setLoading(false);
     }
   }
+
+  // MANEJO DE INICIO DE SESIÓN
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!supabase) {
+      setLoginError("Servicio de Supabase no inicializado.");
+      return;
+    }
+
+    setLoggingIn(true);
+    setLoginError(null);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: loginEmail.trim(),
+      password: loginPassword,
+    });
+
+    if (error) {
+      setLoginError("Credenciales incorrectas. Comprueba tu correo y contraseña.");
+      setLoggingIn(false);
+    } else {
+      setLoggingIn(false);
+      setLoginEmail('');
+      setLoginPassword('');
+    }
+  };
+
+  const handleLogout = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    setSession(null);
+  };
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -589,10 +629,73 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
     return matchesSearch && matchesEra;
   });
 
+  // VISTA: PANTALLA DE LOGIN SI NO HAY SESIÓN
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-gray-100 font-sans flex flex-col justify-center items-center px-4">
+        <div className="max-w-sm w-full bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-pink-600 via-pink-500 to-pink-700"></div>
+
+          <div className="text-center mb-6">
+            <div className="bg-gradient-to-tr from-pink-700 to-pink-500 text-white font-black rounded-xl w-12 h-12 flex items-center justify-center text-xl shadow-lg shadow-pink-600/30 mx-auto mb-3">
+              V
+            </div>
+            <h1 className="text-base font-black tracking-widest text-pink-500 uppercase">LA VITRINA</h1>
+            <p className="text-[10px] text-gray-400 mt-0.5 tracking-wider uppercase font-semibold">Acceso a Beta Privada</p>
+          </div>
+
+          {loginError && (
+            <div className="mb-4 p-3 bg-red-950/80 border border-red-800/80 text-red-300 text-xs rounded-xl font-medium">
+              {loginError}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Correo Electrónico:</label>
+              <input
+                type="email"
+                placeholder="usuario@lavitrina.com"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                className="w-full bg-gray-950 border border-gray-800 text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-pink-500 transition"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Contraseña:</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                className="w-full bg-gray-950 border border-gray-800 text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-pink-500 transition"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loggingIn}
+              className="w-full bg-gradient-to-r from-pink-600 to-pink-500 hover:from-pink-500 hover:to-pink-400 text-white text-xs font-bold py-3 rounded-xl transition shadow-lg shadow-pink-600/20 disabled:opacity-50 mt-2"
+            >
+              {loggingIn ? 'Iniciando Sesión...' : 'Entrar a La Vitrina'}
+            </button>
+          </form>
+
+          <div className="mt-6 pt-4 border-t border-gray-800 text-center">
+            <p className="text-[10px] text-gray-500">¿Necesitas acceso? Solicita tus credenciales beta.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 font-sans pb-24 pt-2 relative">
       
-      {/* CABECERA MÓVIL SOBERBIA */}
+      {/* CABECERA MÓVIL */}
       <header className="bg-gray-900/90 border-b border-pink-900/30 px-3.5 py-2.5 sticky top-0 z-40 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2.5">
@@ -601,7 +704,9 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
             </div>
             <div>
               <h1 className="text-xs font-black tracking-widest text-pink-500 uppercase leading-none">LA VITRINA</h1>
-              <p className="text-[9px] text-gray-400 font-medium tracking-wide leading-none mt-0.5">COLLECTIONS</p>
+              <p className="text-[9px] text-gray-400 font-medium tracking-wide leading-none mt-0.5 truncate max-w-[120px]">
+                {session?.user?.email?.split('@')[0]}
+              </p>
             </div>
           </div>
 
@@ -613,12 +718,12 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               <span className="text-gray-400 font-normal">Valor:</span> {currency === 'EUR' ? `${totalCollectionValueEUR.toLocaleString()} €` : `${Math.round(totalCollectionValueEUR * exchangeRateUSD).toLocaleString()} $`}
             </button>
             <button
-              onClick={() => setShowShareModal(true)}
-              className="bg-gray-800/80 border border-gray-700/80 text-gray-300 hover:text-pink-400 text-xs p-1.5 rounded-lg transition"
-              title="Compartir Vitrina"
+              onClick={handleLogout}
+              className="bg-gray-800/80 border border-gray-700/80 text-gray-400 hover:text-red-400 text-xs p-1.5 rounded-lg transition"
+              title="Cerrar Sesión"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
             </button>
           </div>
