@@ -443,7 +443,7 @@ export default function App() {
     setActiveTab('vitrina');
   };
 
-  // ESCÁNER ULTRA RÁPIDO Y ENCUADRE SOBRE FONDO BLANCO PURO (RESPUESTA INSTANTÁNEA)
+  // ESCÁNER MANTENIENDO LA FOTO COMPLETA PROPORCIONAL Y FONDO BLANCO PURO
   const handleScanImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -458,33 +458,40 @@ export default function App() {
       
       img.onload = async () => {
         const canvas = document.createElement('canvas');
-        // Reducimos a 500px para máxima velocidad de respuesta sin lags
-        const MAX_WIDTH = 500;
-        const scale = MAX_WIDTH / img.width;
-        canvas.width = MAX_WIDTH;
-        canvas.height = img.height * scale;
+        const MAX_DIMENSION = 600; // Escalado veloz preservando toda la foto
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIMENSION) {
+            height *= MAX_DIMENSION / width;
+            width = MAX_DIMENSION;
+          }
+        } else {
+          if (height > MAX_DIMENSION) {
+            width *= MAX_DIMENSION / height;
+            height = MAX_DIMENSION;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
 
         const ctx = canvas.getContext('2d');
         
-        // 1. DIBUJAR LIENZO BLANCO PURO (#FFFFFF)
+        // DIBUJAR FONDO BLANCO PURO ABSOLUTO
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // 2. ENCUADRE DE FIGURA: Recortar los bordes exteriores sobrantes de la habitación/fondo
-        const cropX = canvas.width * 0.08;
-        const cropY = canvas.height * 0.08;
-        const cropWidth = canvas.width * 0.84;
-        const cropHeight = canvas.height * 0.84;
+        // DIBUJAR LA FOTO COMPLETA CENTRADA SIN RECORTAR CONTENIDO
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
-
-        // Generar base64 con compresión ligera (40%) ultra rápida
-        const fullBase64 = canvas.toDataURL('image/jpeg', 0.4);
+        const fullBase64 = canvas.toDataURL('image/jpeg', 0.5);
         setScannedImageBase64(fullBase64);
         const base64Data = fullBase64.split(',')[1];
 
-        // 3. ENVIAR A LA IA GEMINI FORZANDO EL ANÁLISIS DEL OBJETO CENTRADO
-        const promptInstruction = `Identifica la Barbie o caja que aparece en el centro de esta foto para un catálogo oficial.
+        // ENVÍO A IA GEMINI
+        const promptInstruction = `Identifica la Barbie que aparece en esta imagen para un catálogo de coleccionismo.
 Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 {
   "primary_match": {
@@ -749,7 +756,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         {activeTab === 'scan' && (
           <section className="max-w-md mx-auto bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl">
             <h2 className="text-base font-extrabold text-pink-500 text-center mb-1">Escáner de Catalogación IA</h2>
-            <p className="text-[11px] text-gray-400 text-center mb-4">Fotografía la Barbie para encuadrarla, identificarla y registrarla automáticamente.</p>
+            <p className="text-[11px] text-gray-400 text-center mb-4">Fotografía la Barbie para procesarla, identificarla y registrarla automáticamente.</p>
 
             {saveSuccessMsg && (
               <div className="mb-3 p-2 bg-green-950/80 border border-green-600 text-green-300 text-xs text-center rounded-lg font-bold">
@@ -771,8 +778,8 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
               {scannedImageBase64 && (
                 <div className="mt-3 text-center">
-                  <p className="text-[9px] text-gray-400 mb-1 font-bold">Vista previa (Fondo Blanco Integrado):</p>
-                  <img src={scannedImageBase64} alt="Captura" className="max-h-48 rounded-lg border border-gray-800 mx-auto bg-white p-1" />
+                  <p className="text-[9px] text-gray-400 mb-1 font-bold">Vista previa (Fondo Blanco Aplicado):</p>
+                  <img src={scannedImageBase64} alt="Captura" className="max-h-48 rounded-lg border border-gray-800 mx-auto bg-white p-1 object-contain" />
                 </div>
               )}
             </div>
