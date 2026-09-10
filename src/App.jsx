@@ -226,7 +226,7 @@ export default function App() {
     }, 450);
   };
 
-  // CONTROLES DE ZOOM E INTERACCIÓN
+  // FUNCIONES DE CONTROL DE ZOOM E INTERACCIÓN
   const handleZoomIn = () => setZoomScale(prev => Math.min(prev + 0.5, 3));
   const handleZoomOut = () => {
     setZoomScale(prev => {
@@ -443,7 +443,7 @@ export default function App() {
     setActiveTab('vitrina');
   };
 
-  // ESCÁNER ULTRA RÁPIDO CON PREPARACIÓN LIGERA PARA EL SERVIDOR
+  // ESCÁNER IA CON APLICACIÓN DE FONDO BLANCO PERMANENTE
   const handleScanImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -458,35 +458,26 @@ export default function App() {
       
       img.onload = async () => {
         const canvas = document.createElement('canvas');
-        const MAX_DIMENSION = 600;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_DIMENSION) {
-            height *= MAX_DIMENSION / width;
-            width = MAX_DIMENSION;
-          }
-        } else {
-          if (height > MAX_DIMENSION) {
-            width *= MAX_DIMENSION / height;
-            height = MAX_DIMENSION;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
+        const MAX_WIDTH = 600;
+        const scale = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scale;
 
         const ctx = canvas.getContext('2d');
+        
+        // PINTAR FONDO BLANCO PURO SÓLIDO (#FFFFFF)
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Renderizar foto sobre el fondo blanco
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
+        // Generar Base64 JPEG que incluye el fondo blanco de forma permanente
         const fullBase64 = canvas.toDataURL('image/jpeg', 0.5);
         setScannedImageBase64(fullBase64);
         const base64Data = fullBase64.split(',')[1];
 
-        const promptInstruction = `Identifica la Barbie que aparece en esta foto para un catálogo oficial.
+        const promptInstruction = `Identifica la Barbie de esta foto de forma precisa para un catálogo de coleccionismo.
 Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 {
   "primary_match": {
@@ -494,7 +485,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
     "collection_line": "Línea oficial o temática de Mattel",
     "release_year": 2000,
     "estimated_min_price": 45,
-    "lore": "Redacta una historia rica e informativa estructurada para coleccionistas. Incluye: 1) Detalles del vestuario y paleta de colores. 2) Concepto estético o inspiración. 3) Molde facial/escultura de rostro usado y estética de maquillaje. 4) Accesorios y extras incluidos."
+    "lore": "Redacta una historia rica e informativa estructurada para coleccionistas. Incluye: 1) Detalles del vestuario y paleta de colores. 2) Concepto estético o inspiración. 3) Molde facial/escultura de rostro usado (ej. Superstar, Generation Girl, Mackie) y estética de maquillaje. 4) Accesorios y extras incluidos."
   }
 }`;
 
@@ -514,11 +505,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
           setDebugError(`Error en servidor: ${data.error}`);
           setScanning(false);
           return;
-        }
-
-        // Si la API devuelve una imagen procesada/recortada la actualizamos
-        if (data.processedImageBase64) {
-          setScannedImageBase64(data.processedImageBase64);
         }
 
         const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -665,7 +651,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                 {myCollection.map((item) => (
                   <div key={item.userInstanceId || item.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden flex flex-col justify-between group relative">
                     <div>
-                      {/* CAJA DE VITRINA CON FONDO BLANCO PURO */}
+                      {/* CAJA DE VITRINA 3D CON FONDO BLANCO */}
                       <div 
                         onClick={() => handleOpenVitrinaDoll(item)}
                         className="h-44 bg-white p-2 flex items-center justify-center relative cursor-pointer overflow-hidden border-b border-gray-800"
@@ -752,11 +738,11 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
           </section>
         )}
 
-        {/* TAB: ESCÁNER CON GUARDADO DIRECTO AL CATÁLOGO MAESTRO */}
+        {/* TAB: ESCÁNER CON GUARDADO DIRECTO AL CATÁLOGO MAESTRO Y FONDO BLANCO */}
         {activeTab === 'scan' && (
           <section className="max-w-md mx-auto bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl">
             <h2 className="text-base font-extrabold text-pink-500 text-center mb-1">Escáner de Catalogación IA</h2>
-            <p className="text-[11px] text-gray-400 text-center mb-4">Fotografía la Barbie para procesarla, identificarla y registrarla automáticamente.</p>
+            <p className="text-[11px] text-gray-400 text-center mb-4">Fotografía la Barbie para identificarla y registrarla directamente en el Catálogo Maestro.</p>
 
             {saveSuccessMsg && (
               <div className="mb-3 p-2 bg-green-950/80 border border-green-600 text-green-300 text-xs text-center rounded-lg font-bold">
@@ -779,14 +765,14 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               {scannedImageBase64 && (
                 <div className="mt-3 text-center">
                   <p className="text-[9px] text-gray-400 mb-1 font-bold">Vista previa (Fondo Blanco Aplicado):</p>
-                  <img src={scannedImageBase64} alt="Captura" className="max-h-48 rounded-lg border border-gray-800 mx-auto bg-white p-1 object-contain" />
+                  <img src={scannedImageBase64} alt="Captura" className="max-h-48 rounded-lg border border-gray-800 mx-auto bg-white p-1" />
                 </div>
               )}
             </div>
 
             {scanning && (
               <div className="mt-4 p-3 bg-gray-950 rounded-lg border border-pink-900/50 text-center text-pink-400 font-bold text-xs animate-pulse">
-                Procesando imagen, identificando modelo y redactando historia documental...
+                Identificando modelo y redactando historia documental...
               </div>
             )}
 
@@ -825,7 +811,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         {/* TAB: CATÁLOGO MAESTRO */}
         {activeTab === 'catalog' && (
           <section>
-            {/* BARRA DE BÚSQUEDA Y FILTROS FLOTANTES (STICKY) */}
+            {/* BARRA DE BÚSQUEDA Y FILTROS FLOTANTES (STICKY) SIN INTERFERIR */}
             <div className="sticky top-12 z-30 bg-gray-900/95 backdrop-blur-md p-2.5 rounded-xl mb-3 border border-pink-900/40 flex flex-col gap-2 shadow-lg">
               <input
                 type="text"
@@ -1039,7 +1025,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               )}
             </div>
 
-            {/* MARCO DE EXHIBICIÓN CON FOTO SOBRE BLANCO */}
+            {/* MARCO DE EXHIBICIÓN DE FOTO CON LÓGICA DE ZOOM Y ARRASTRE */}
             <div 
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
