@@ -443,7 +443,7 @@ export default function App() {
     setActiveTab('vitrina');
   };
 
-  // ESCÁNER CON ENCUADRE Y RECORTE INTELIGENTE SOBRE FONDO BLANCO
+  // ESCÁNER ULTRA RÁPIDO Y ENCUADRE SOBRE FONDO BLANCO PURO (RESPUESTA INSTANTÁNEA)
   const handleScanImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -458,35 +458,33 @@ export default function App() {
       
       img.onload = async () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 600;
+        // Reducimos a 500px para máxima velocidad de respuesta sin lags
+        const MAX_WIDTH = 500;
         const scale = MAX_WIDTH / img.width;
         canvas.width = MAX_WIDTH;
         canvas.height = img.height * scale;
 
         const ctx = canvas.getContext('2d');
         
-        // 1. PINTAR LIENZO EN BLANCO ABSOLUTO (#FFFFFF)
+        // 1. DIBUJAR LIENZO BLANCO PURO (#FFFFFF)
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // 2. ENCUADRE DE PRODUCTO: Centrar y ajustar recortando márgenes exteriores
-        const cropMarginX = canvas.width * 0.05; // 5% de recubrimiento
-        const cropMarginY = canvas.height * 0.05;
+        // 2. ENCUADRE DE FIGURA: Recortar los bordes exteriores sobrantes de la habitación/fondo
+        const cropX = canvas.width * 0.08;
+        const cropY = canvas.height * 0.08;
+        const cropWidth = canvas.width * 0.84;
+        const cropHeight = canvas.height * 0.84;
 
-        ctx.drawImage(
-          img,
-          cropMarginX, cropMarginY,
-          canvas.width - (cropMarginX * 2),
-          canvas.height - (cropMarginY * 2)
-        );
+        ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
 
-        // Generar la versión recortada sobre blanco
-        const fullBase64 = canvas.toDataURL('image/jpeg', 0.6);
+        // Generar base64 con compresión ligera (40%) ultra rápida
+        const fullBase64 = canvas.toDataURL('image/jpeg', 0.4);
         setScannedImageBase64(fullBase64);
         const base64Data = fullBase64.split(',')[1];
 
-        // 3. IA CATALOGADORA (GEMINI)
-        const promptInstruction = `Identifica la Barbie de esta foto de forma precisa para un catálogo de coleccionismo.
+        // 3. ENVIAR A LA IA GEMINI FORZANDO EL ANÁLISIS DEL OBJETO CENTRADO
+        const promptInstruction = `Identifica la Barbie o caja que aparece en el centro de esta foto para un catálogo oficial.
 Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 {
   "primary_match": {
