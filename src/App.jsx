@@ -443,7 +443,7 @@ export default function App() {
     setActiveTab('vitrina');
   };
 
-  // ESCÁNER MANTENIENDO LA FOTO COMPLETA PROPORCIONAL Y FONDO BLANCO PURO
+  // ESCÁNER ULTRA RÁPIDO CON PREPARACIÓN LIGERA PARA EL SERVIDOR
   const handleScanImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -458,7 +458,7 @@ export default function App() {
       
       img.onload = async () => {
         const canvas = document.createElement('canvas');
-        const MAX_DIMENSION = 600; // Escalado veloz preservando toda la foto
+        const MAX_DIMENSION = 600;
         let width = img.width;
         let height = img.height;
 
@@ -478,20 +478,15 @@ export default function App() {
         canvas.height = height;
 
         const ctx = canvas.getContext('2d');
-        
-        // DIBUJAR FONDO BLANCO PURO ABSOLUTO
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // DIBUJAR LA FOTO COMPLETA CENTRADA SIN RECORTAR CONTENIDO
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
         const fullBase64 = canvas.toDataURL('image/jpeg', 0.5);
         setScannedImageBase64(fullBase64);
         const base64Data = fullBase64.split(',')[1];
 
-        // ENVÍO A IA GEMINI
-        const promptInstruction = `Identifica la Barbie que aparece en esta imagen para un catálogo de coleccionismo.
+        const promptInstruction = `Identifica la Barbie que aparece en esta foto para un catálogo oficial.
 Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 {
   "primary_match": {
@@ -499,7 +494,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
     "collection_line": "Línea oficial o temática de Mattel",
     "release_year": 2000,
     "estimated_min_price": 45,
-    "lore": "Redacta una historia rica e informativa estructurada para coleccionistas. Incluye: 1) Detalles del vestuario y paleta de colores. 2) Concepto estético o inspiración. 3) Molde facial/escultura de rostro usado (ej. Superstar, Generation Girl, Mackie) y estética de maquillaje. 4) Accesorios y extras incluidos."
+    "lore": "Redacta una historia rica e informativa estructurada para coleccionistas. Incluye: 1) Detalles del vestuario y paleta de colores. 2) Concepto estético o inspiración. 3) Molde facial/escultura de rostro usado y estética de maquillaje. 4) Accesorios y extras incluidos."
   }
 }`;
 
@@ -519,6 +514,11 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
           setDebugError(`Error en servidor: ${data.error}`);
           setScanning(false);
           return;
+        }
+
+        // Si la API devuelve una imagen procesada/recortada la actualizamos
+        if (data.processedImageBase64) {
+          setScannedImageBase64(data.processedImageBase64);
         }
 
         const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
