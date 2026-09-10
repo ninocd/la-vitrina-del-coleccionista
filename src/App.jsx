@@ -37,12 +37,18 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('vitrina');
 
   // Estado Formulario de Autenticación
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  const [authMode, setAuthMode] = useState('login');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState(null);
   const [authMsg, setAuthMsg] = useState('');
   const [authSubmitting, setAuthSubmitting] = useState(false);
+
+  // Estado Cambio de Contraseña de Usuario
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordStatus, setPasswordStatus] = useState({ error: null, success: null, loading: false });
 
   // Datos
   const [masterCatalog, setMasterCatalog] = useState([]);
@@ -141,7 +147,6 @@ export default function App() {
     try {
       if (!supabase) return;
 
-      // 1. EL CATÁLOGO MAESTRO ES GLOBAL (SE MANTIENE IGUAL PARA TODOS)
       const { data: masterData, error: masterErr } = await supabase
         .from('barbies_master')
         .select('*')
@@ -171,7 +176,6 @@ export default function App() {
 
       setMasterCatalog(catalog);
 
-      // 2. MI VITRINA SE FILTRA ÚNICAMENTE PARA EL USUARIO AUTENTICADO
       const currentUserId = userId || session?.user?.id;
       if (!currentUserId) {
         setMyCollection([]);
@@ -210,6 +214,43 @@ export default function App() {
       setLoading(false);
     }
   }
+
+  // MANEJO DE CAMBIO DE CONTRASEÑA EN SUPABASE
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    setPasswordStatus({ error: null, success: null, loading: true });
+
+    if (newPassword.length < 6) {
+      setPasswordStatus({ error: "La contraseña debe tener al menos 6 caracteres.", success: null, loading: false });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordStatus({ error: "Las contraseñas no coinciden.", success: null, loading: false });
+      return;
+    }
+
+    if (!supabase) {
+      setPasswordStatus({ error: "Supabase no está disponible.", success: null, loading: false });
+      return;
+    }
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (error) {
+      setPasswordStatus({ error: `Error: ${error.message}`, success: null, loading: false });
+    } else {
+      setPasswordStatus({ error: null, success: "¡Contraseña actualizada con éxito!", loading: false });
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => {
+        setShowPasswordModal(false);
+        setPasswordStatus({ error: null, success: null, loading: false });
+      }, 2000);
+    }
+  };
 
   // LOG IN / REGISTRO
   const handleAuthSubmit = async (e) => {
@@ -306,7 +347,6 @@ export default function App() {
     }, 450);
   };
 
-  // CONTROLES DE ZOOM E INTERACCIÓN
   const handleZoomIn = () => setZoomScale(prev => Math.min(prev + 0.5, 3));
   const handleZoomOut = () => {
     setZoomScale(prev => {
@@ -645,14 +685,12 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  // Filtrado de Mi Vitrina
   const filteredMyCollection = myCollection.filter((barbie) => {
     const nameMatch = (barbie.name || '').toLowerCase().includes(vitrinaSearchTerm.toLowerCase());
     const lineMatch = (barbie.collection_line || '').toLowerCase().includes(vitrinaSearchTerm.toLowerCase());
     return nameMatch || lineMatch;
   });
 
-  // Filtrado del Catálogo Maestro
   const filteredMasterCatalog = masterCatalog.filter((barbie) => {
     const nameMatch = (barbie.name || '').toLowerCase().includes(catalogSearchTerm.toLowerCase());
     const lineMatch = (barbie.collection_line || '').toLowerCase().includes(catalogSearchTerm.toLowerCase());
@@ -668,7 +706,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
     return matchesSearch && matchesEra;
   });
 
-  // VISTA: PANTALLA FIJA DE AUTENTICACIÓN (LOG IN / REGISTRO) SI NO HAY SESIÓN
+  // PANTALLA DE LOG IN / REGISTRO SI NO HAY SESIÓN
   if (!session) {
     return (
       <div className="min-h-screen bg-gray-950 text-gray-100 font-sans flex flex-col justify-center items-center px-4">
@@ -683,7 +721,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
             <p className="text-[10px] text-gray-400 mt-0.5 tracking-wider uppercase font-semibold">Plataforma de Coleccionismo</p>
           </div>
 
-          {/* SELECTOR DE MODO: LOG IN / REGISTRARSE */}
           <div className="grid grid-cols-2 gap-1 bg-gray-950 p-1 rounded-xl mb-5 border border-gray-800/80">
             <button
               onClick={() => { setAuthMode('login'); setAuthError(null); setAuthMsg(''); }}
@@ -767,19 +804,29 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
             </div>
             <div>
               <h1 className="text-xs font-black tracking-widest text-pink-500 uppercase leading-none">LA VITRINA</h1>
-              <p className="text-[9px] text-gray-400 font-medium tracking-wide leading-none mt-0.5 truncate max-w-[120px]">
+              <p className="text-[9px] text-gray-400 font-medium tracking-wide leading-none mt-0.5 truncate max-w-[110px]">
                 {session?.user?.email?.split('@')[0]}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setShowMobileMetrics(!showMobileMetrics)}
-              className="bg-gray-800/80 border border-gray-700/80 text-pink-400 text-[11px] px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition hover:bg-gray-800"
+              className="bg-gray-800/80 border border-gray-700/80 text-pink-400 text-[11px] px-2 py-1 rounded-lg font-bold flex items-center gap-1 transition hover:bg-gray-800"
             >
               <span className="text-gray-400 font-normal">Valor:</span> {currency === 'EUR' ? `${totalCollectionValueEUR.toLocaleString()} €` : `${Math.round(totalCollectionValueEUR * exchangeRateUSD).toLocaleString()} $`}
             </button>
+
+            {/* BOTÓN CAMBIAR CONTRASEÑA */}
+            <button
+              onClick={() => setShowPasswordModal(true)}
+              className="bg-gray-800/80 border border-gray-700/80 text-yellow-400 hover:text-yellow-300 text-xs p-1.5 rounded-lg transition"
+              title="Cambiar Contraseña"
+            >
+              🔑
+            </button>
+
             <button
               onClick={handleLogout}
               className="bg-gray-800/80 border border-gray-700/80 text-gray-400 hover:text-red-400 text-xs px-2 py-1 rounded-lg transition font-bold flex items-center gap-1"
@@ -793,7 +840,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
           </div>
         </div>
 
-        {/* MÉTRICAS COMPACTAS */}
         {showMobileMetrics && (
           <div className="mt-2 pt-2 border-t border-gray-800 grid grid-cols-3 gap-2 text-center text-xs animate-fadeIn">
             <div className="bg-gray-950 p-2 rounded-lg border border-gray-800">
@@ -817,10 +863,9 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
       {/* VISTA PRINCIPAL */}
       <main className="max-w-7xl mx-auto px-3 mt-3">
 
-        {/* TAB: MI VITRINA (PRIVADA POR USUARIO) */}
+        {/* TAB: MI VITRINA */}
         {activeTab === 'vitrina' && (
           <section>
-            {/* BUSCADOR FLOTANTE FLUIDO EN VITRINA */}
             <div className="sticky top-12 z-30 bg-gray-900/95 backdrop-blur-md p-2 rounded-xl mb-3 border border-pink-900/30 flex items-center gap-2 shadow-lg">
               <div className="relative w-full">
                 <input
@@ -852,7 +897,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                 {filteredMyCollection.map((item) => (
                   <div key={item.userInstanceId || item.id} className="bg-gray-900/90 border border-gray-800/90 rounded-xl overflow-hidden flex flex-col justify-between group relative">
                     <div>
-                      {/* CAJA DE VITRINA CON FONDO BLANCO PURO */}
                       <div 
                         onClick={() => handleOpenVitrinaDoll(item)}
                         className="h-44 bg-white p-2 flex items-center justify-center relative cursor-pointer overflow-hidden border-b border-gray-800/80"
@@ -868,7 +912,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
                         <div className="absolute bottom-2 w-3/4 h-1 bg-gradient-to-r from-transparent via-pink-400/30 to-transparent rounded-full blur-[1px]"></div>
 
-                        {/* PUERTAS DE CRISTAL INTERACTIVAS */}
                         <div 
                           className="absolute top-0 left-0 w-1/2 h-full bg-pink-400/10 border-r border-gray-300/40 backdrop-blur-[1px] transition-transform duration-500 ease-in-out origin-left flex items-center justify-end pr-1 pointer-events-none z-20 group-hover:-rotate-y-100"
                           style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
@@ -905,7 +948,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                       </div>
                     </div>
                     
-                    {/* BOTONES DE ACCIÓN EN VITRINA */}
                     <div className="p-2 border-t border-gray-800/80 bg-gray-950/80 flex items-center justify-between">
                       <span className="text-pink-400 font-extrabold text-xs">{item.estimated_min_price} €</span>
                       <div className="flex gap-1">
@@ -945,7 +987,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
           </section>
         )}
 
-        {/* TAB: ESCÁNER CON GUARDADO DIRECTO AL CATÁLOGO MAESTRO */}
+        {/* TAB: ESCÁNER */}
         {activeTab === 'scan' && (
           <section className="max-w-md mx-auto bg-gray-900/90 border border-gray-800 rounded-xl p-4 shadow-xl">
             <h2 className="text-sm font-extrabold text-pink-500 tracking-wider uppercase text-center mb-1">Escáner de Catalogación IA</h2>
@@ -1019,10 +1061,9 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
           </section>
         )}
 
-        {/* TAB: CATÁLOGO MAESTRO (COMPARTIDO GLOBALMENTE) */}
+        {/* TAB: CATÁLOGO MAESTRO */}
         {activeTab === 'catalog' && (
           <section>
-            {/* BARRA DE BÚSQUEDA Y FILTROS FLOTANTES (STICKY) */}
             <div className="sticky top-12 z-30 bg-gray-900/95 backdrop-blur-md p-2.5 rounded-xl mb-3 border border-pink-900/30 flex flex-col gap-2 shadow-lg">
               <div className="relative w-full">
                 <input
@@ -1061,7 +1102,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                   return (
                     <div key={barbie.id} className="bg-gray-900 border border-gray-800/90 rounded-xl overflow-hidden flex flex-col justify-between">
                       <div>
-                        {/* CONTENEDOR CON FONDO BLANCO PURO */}
                         <div className="h-40 bg-white p-2 flex items-center justify-center relative">
                           {barbie.image_url ? (
                             <img src={barbie.image_url} alt={barbie.name} className="max-h-full object-contain rounded-md filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)]" />
@@ -1085,7 +1125,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                         </div>
                       </div>
 
-                      {/* CONTROLES DEL CATÁLOGO MAESTRO */}
                       <div className="p-2 border-t border-gray-800/80 bg-gray-950/80 flex flex-col gap-1.5">
                         <div className="flex justify-between items-center">
                           <span className="text-pink-400 font-extrabold text-xs">{barbie.estimated_min_price} €</span>
@@ -1193,7 +1232,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
       </main>
 
-      {/* BOTÓN FLOTANTE ELEGANTE "VOLVER ARRIBA" */}
+      {/* BOTÓN FLOTANTE "VOLVER ARRIBA" */}
       {showScrollTop && (
         <button
           onClick={scrollToTop}
@@ -1207,7 +1246,81 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         </button>
       )}
 
-      {/* MODAL 3D CON CONTROLES DE ZOOM E INSPECTOR DE VITRINA */}
+      {/* MODAL CAMBIAR CONTRASEÑA */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-pink-900/50 rounded-2xl p-5 max-w-xs w-full relative shadow-2xl">
+            <button 
+              onClick={() => { setShowPasswordModal(false); setPasswordStatus({ error: null, success: null, loading: false }); }}
+              className="absolute top-3 right-3 text-gray-400 hover:text-white font-bold text-xs"
+            >
+              ✕
+            </button>
+            
+            <h3 className="text-sm font-black text-pink-500 mb-1 flex items-center gap-1.5">
+              <span>🔑</span> Cambiar Contraseña
+            </h3>
+            <p className="text-[10px] text-gray-400 mb-4">Actualiza tu clave de acceso para tu cuenta beta.</p>
+
+            {passwordStatus.error && (
+              <div className="mb-3 p-2 bg-red-950/80 border border-red-800 text-red-300 text-[10px] rounded-lg">
+                {passwordStatus.error}
+              </div>
+            )}
+
+            {passwordStatus.success && (
+              <div className="mb-3 p-2 bg-green-950/80 border border-green-800 text-green-300 text-[10px] rounded-lg text-center font-bold">
+                {passwordStatus.success}
+              </div>
+            )}
+
+            <form onSubmit={handleUpdatePassword} className="space-y-3 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-gray-300 block mb-1 uppercase tracking-wider">Nueva Contraseña:</label>
+                <input
+                  type="password"
+                  placeholder="Mínimo 6 caracteres"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 text-white rounded-xl p-2.5 text-xs focus:outline-none focus:border-pink-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-300 block mb-1 uppercase tracking-wider">Confirmar Contraseña:</label>
+                <input
+                  type="password"
+                  placeholder="Repite la contraseña"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 text-white rounded-xl p-2.5 text-xs focus:outline-none focus:border-pink-500"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(false)}
+                  className="bg-gray-800 text-gray-300 px-3 py-2 rounded-xl font-bold text-xs hover:bg-gray-700 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={passwordStatus.loading}
+                  className="bg-pink-600 hover:bg-pink-500 text-white px-4 py-2 rounded-xl font-bold text-xs transition shadow-md disabled:opacity-50"
+                >
+                  {passwordStatus.loading ? 'Guardando...' : 'Actualizar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3D INSPECTOR */}
       {showVitrinaDoorsModal && selectedVitrinaDoll && (
         <div 
           onClick={handleCloseVitrinaDoll}
@@ -1224,7 +1337,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               ✕
             </button>
 
-            {/* CONTROLES FLOTANTES DE ZOOM */}
             <div className="absolute top-2 left-2 z-40 flex items-center gap-1 bg-gray-900/80 backdrop-blur-md border border-gray-700/80 p-1 rounded-lg shadow-md">
               <button 
                 onClick={handleZoomIn} 
@@ -1250,7 +1362,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               )}
             </div>
 
-            {/* MARCO DE EXHIBICIÓN CON FOTO SOBRE BLANCO */}
             <div 
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
@@ -1280,7 +1391,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
               <div className="absolute bottom-3 w-3/4 h-1.5 bg-gradient-to-r from-transparent via-pink-400/30 to-transparent rounded-full blur-[1px]"></div>
 
-              {/* PUERTAS DE CRISTAL INTERACTIVAS */}
               <div 
                 className="absolute top-0 left-0 w-1/2 h-full bg-pink-400/10 border-r border-gray-300/40 backdrop-blur-[2px] transition-transform duration-500 ease-in-out origin-left flex items-center justify-end pr-1.5 pointer-events-none z-20"
                 style={{ 
@@ -1319,7 +1429,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         </div>
       )}
 
-      {/* NAVEGACIÓN INFERIOR ELEGANTE Y MINIMALISTA */}
+      {/* NAVEGACIÓN INFERIOR */}
       <nav className="fixed bottom-0 left-0 right-0 bg-gray-900/95 border-t border-gray-800 z-50 backdrop-blur-lg px-2 py-2">
         <div className="max-w-md mx-auto flex justify-around items-center">
           <button 
