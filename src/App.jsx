@@ -36,11 +36,13 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('vitrina');
 
-  // Estado Formulario de Login
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginError, setLoginError] = useState(null);
-  const [loggingIn, setLoggingIn] = useState(false);
+  // Estado Formulario de Autenticación
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState(null);
+  const [authMsg, setAuthMsg] = useState('');
+  const [authSubmitting, setAuthSubmitting] = useState(false);
 
   // Datos
   const [masterCatalog, setMasterCatalog] = useState([]);
@@ -123,7 +125,12 @@ export default function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) fetchData();
+      if (session) {
+        fetchData();
+      } else {
+        setMyCollection([]);
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -195,29 +202,51 @@ export default function App() {
     }
   }
 
-  // MANEJO DE INICIO DE SESIÓN
-  const handleLogin = async (e) => {
+  // LOG IN / REGISTRO
+  const handleAuthSubmit = async (e) => {
     e.preventDefault();
     if (!supabase) {
-      setLoginError("Servicio de Supabase no inicializado.");
+      setAuthError("Supabase no está configurado correctamente.");
       return;
     }
 
-    setLoggingIn(true);
-    setLoginError(null);
+    setAuthSubmitting(true);
+    setAuthError(null);
+    setAuthMsg('');
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: loginEmail.trim(),
-      password: loginPassword,
-    });
+    if (authMode === 'login') {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: authEmail.trim(),
+        password: authPassword,
+      });
 
-    if (error) {
-      setLoginError("Credenciales incorrectas. Comprueba tu correo y contraseña.");
-      setLoggingIn(false);
+      if (error) {
+        setAuthError("Correo o contraseña incorrectos.");
+        setAuthSubmitting(false);
+      } else {
+        setAuthSubmitting(false);
+        setAuthEmail('');
+        setAuthPassword('');
+      }
     } else {
-      setLoggingIn(false);
-      setLoginEmail('');
-      setLoginPassword('');
+      const { data, error } = await supabase.auth.signUp({
+        email: authEmail.trim(),
+        password: authPassword,
+      });
+
+      if (error) {
+        setAuthError(`Error en registro: ${error.message}`);
+        setAuthSubmitting(false);
+      } else {
+        setAuthSubmitting(false);
+        if (data?.user?.identities?.length === 0) {
+          setAuthError("Este correo ya está registrado. Por favor, inicia sesión.");
+        } else {
+          setAuthMsg("¡Cuenta creada correctamente! Ya puedes iniciar sesión.");
+          setAuthMode('login');
+          setAuthPassword('');
+        }
+      }
     }
   };
 
@@ -226,6 +255,7 @@ export default function App() {
       await supabase.auth.signOut();
     }
     setSession(null);
+    setMyCollection([]);
   };
 
   const scrollToTop = () => {
@@ -629,7 +659,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
     return matchesSearch && matchesEra;
   });
 
-  // VISTA: PANTALLA DE LOGIN SI NO HAY SESIÓN
+  // VISTA: PANTALLA FIJA DE AUTENTICACIÓN (LOG IN / REGISTRO) SI NO HAY SESIÓN
   if (!session) {
     return (
       <div className="min-h-screen bg-gray-950 text-gray-100 font-sans flex flex-col justify-center items-center px-4">
@@ -641,23 +671,45 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               V
             </div>
             <h1 className="text-base font-black tracking-widest text-pink-500 uppercase">LA VITRINA</h1>
-            <p className="text-[10px] text-gray-400 mt-0.5 tracking-wider uppercase font-semibold">Acceso a Beta Privada</p>
+            <p className="text-[10px] text-gray-400 mt-0.5 tracking-wider uppercase font-semibold">Plataforma de Coleccionismo</p>
           </div>
 
-          {loginError && (
+          {/* SELECTOR DE MODO: LOG IN / REGISTRARSE */}
+          <div className="grid grid-cols-2 gap-1 bg-gray-950 p-1 rounded-xl mb-5 border border-gray-800/80">
+            <button
+              onClick={() => { setAuthMode('login'); setAuthError(null); setAuthMsg(''); }}
+              className={`py-1.5 text-xs font-bold rounded-lg transition ${authMode === 'login' ? 'bg-pink-600 text-white shadow' : 'text-gray-400 hover:text-gray-200'}`}
+            >
+              Iniciar Sesión
+            </button>
+            <button
+              onClick={() => { setAuthMode('register'); setAuthError(null); setAuthMsg(''); }}
+              className={`py-1.5 text-xs font-bold rounded-lg transition ${authMode === 'register' ? 'bg-pink-600 text-white shadow' : 'text-gray-400 hover:text-gray-200'}`}
+            >
+              Registrarse
+            </button>
+          </div>
+
+          {authError && (
             <div className="mb-4 p-3 bg-red-950/80 border border-red-800/80 text-red-300 text-xs rounded-xl font-medium">
-              {loginError}
+              {authError}
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          {authMsg && (
+            <div className="mb-4 p-3 bg-green-950/80 border border-green-800/80 text-green-300 text-xs rounded-xl font-medium">
+              {authMsg}
+            </div>
+          )}
+
+          <form onSubmit={handleAuthSubmit} className="space-y-4">
             <div>
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Correo Electrónico:</label>
               <input
                 type="email"
                 placeholder="usuario@lavitrina.com"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
                 className="w-full bg-gray-950 border border-gray-800 text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-pink-500 transition"
                 required
               />
@@ -668,8 +720,8 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               <input
                 type="password"
                 placeholder="••••••••"
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
                 className="w-full bg-gray-950 border border-gray-800 text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-pink-500 transition"
                 required
               />
@@ -677,15 +729,17 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
 
             <button
               type="submit"
-              disabled={loggingIn}
+              disabled={authSubmitting}
               className="w-full bg-gradient-to-r from-pink-600 to-pink-500 hover:from-pink-500 hover:to-pink-400 text-white text-xs font-bold py-3 rounded-xl transition shadow-lg shadow-pink-600/20 disabled:opacity-50 mt-2"
             >
-              {loggingIn ? 'Iniciando Sesión...' : 'Entrar a La Vitrina'}
+              {authSubmitting 
+                ? 'Procesando...' 
+                : (authMode === 'login' ? 'Entrar a La Vitrina' : 'Crear Cuenta')}
             </button>
           </form>
 
           <div className="mt-6 pt-4 border-t border-gray-800 text-center">
-            <p className="text-[10px] text-gray-500">¿Necesitas acceso? Solicita tus credenciales beta.</p>
+            <p className="text-[10px] text-gray-500">Acceso seguro mediante Supabase Auth.</p>
           </div>
         </div>
       </div>
@@ -719,12 +773,13 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
             </button>
             <button
               onClick={handleLogout}
-              className="bg-gray-800/80 border border-gray-700/80 text-gray-400 hover:text-red-400 text-xs p-1.5 rounded-lg transition"
+              className="bg-gray-800/80 border border-gray-700/80 text-gray-400 hover:text-red-400 text-xs px-2 py-1 rounded-lg transition font-bold flex items-center gap-1"
               title="Cerrar Sesión"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
+              <span>Salir</span>
             </button>
           </div>
         </div>
