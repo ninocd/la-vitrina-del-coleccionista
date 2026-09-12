@@ -64,8 +64,9 @@ export default function App() {
   const [myCollection, setMyCollection] = useState([]);
   const [wishlist, setWishlist] = useState([]);
 
-  // ORDENACIÓN DE LA VITRINA
-  const [vitrinaSortBy, setVitrinaSortBy] = useState('custom'); // 'custom', 'year-desc', 'year-asc', 'name-asc', 'price-desc', 'line'
+  // ORDENACIÓN DE LA VITRINA Y ESTADO DE ARRASTRE FÍSICO (DRAG & DROP)
+  const [vitrinaSortBy, setVitrinaSortBy] = useState('custom'); 
+  const [draggedItemIndex, setDraggedItemIndex] = useState(null);
 
   // Interfaz móvil / pública / scroll
   const [showMobileMetrics, setShowMobileMetrics] = useState(false);
@@ -276,17 +277,28 @@ export default function App() {
     }
   }
 
-  // REORDENAR MUÑECAS EN POSICIÓN MANUAL (ARRIBA / ABAJO)
-  const moveDollPosition = (index, direction) => {
-    const newCollection = [...myCollection];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= newCollection.length) return;
+  // LÓGICA DE DRAG & DROP FÍSICO (RATÓN / DEDO)
+  const handleDragStart = (index) => {
+    setDraggedItemIndex(index);
+  };
 
-    const temp = newCollection[index];
-    newCollection[index] = newCollection[targetIndex];
-    newCollection[targetIndex] = temp;
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedItemIndex === null || draggedItemIndex === index) return;
 
-    setMyCollection(newCollection);
+    const updatedCollection = [...myCollection];
+    const draggedItem = updatedCollection[draggedItemIndex];
+    
+    // Intercambiar posiciones
+    updatedCollection.splice(draggedItemIndex, 1);
+    updatedCollection.splice(index, 0, draggedItem);
+
+    setDraggedItemIndex(index);
+    setMyCollection(updatedCollection);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItemIndex(null);
   };
 
   const handleSaveProfile = async (e) => {
@@ -1101,13 +1113,13 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               <div className="flex items-center gap-2 justify-between sm:justify-end shrink-0">
                 {/* SELECTOR DE ORDENACIÓN */}
                 <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-bold text-pink-400 uppercase tracking-wider">Ordenar:</span>
+                  <span className="text-[10px] font-bold text-pink-400 uppercase tracking-wider">Agrupar por:</span>
                   <select
                     value={vitrinaSortBy}
                     onChange={(e) => setVitrinaSortBy(e.target.value)}
                     className="bg-gray-800 border border-gray-700/80 text-white rounded-md px-2 py-1 text-[11px] focus:outline-none focus:border-pink-500"
                   >
-                    <option value="custom">Orden Personalizado / Manual</option>
+                    <option value="custom">Arrastre Físico (Manual con dedo/ratón)</option>
                     <option value="year-desc">Año: Más Reciente primero</option>
                     <option value="year-asc">Año: Más Antiguo (Vintage)</option>
                     <option value="name-asc">Nombre (A - Z)</option>
@@ -1133,8 +1145,21 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {filteredMyCollection.map((item, index) => {
                   const qty = Number(item.quantity) || 1;
+                  const isBeingDragged = draggedItemIndex === index;
+
                   return (
-                    <div key={item.userInstanceId || item.id} className="bg-gray-900/90 border border-gray-800/90 rounded-xl overflow-hidden flex flex-col justify-between group relative">
+                    <div 
+                      key={item.userInstanceId || item.id} 
+                      draggable={vitrinaSortBy === 'custom'}
+                      onDragStart={() => handleDragStart(index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDragEnd={handleDragEnd}
+                      className={`bg-gray-900/90 border rounded-xl overflow-hidden flex flex-col justify-between group relative transition-all duration-200 ${
+                        isBeingDragged 
+                          ? 'opacity-40 border-pink-500 scale-95 shadow-2xl ring-2 ring-pink-500/50' 
+                          : 'border-gray-800/90 hover:border-pink-900/40'
+                      } ${vitrinaSortBy === 'custom' ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                    >
                       <div>
                         <div 
                           onClick={() => handleOpenVitrinaDoll(item)}
@@ -1202,28 +1227,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                         </div>
                         
                         <div className="flex gap-1 items-center">
-                          {/* BOTONES DE MOVER POSICIÓN MANUAL (SOLO SI ORDEN ES CUSTOM) */}
-                          {vitrinaSortBy === 'custom' && (
-                            <div className="flex flex-col gap-0.5 mr-1">
-                              <button 
-                                onClick={() => moveDollPosition(index, 'up')}
-                                disabled={index === 0}
-                                className="bg-gray-800 hover:bg-pink-600 text-gray-300 hover:text-white text-[8px] px-1 rounded disabled:opacity-30 disabled:hover:bg-gray-800"
-                                title="Mover Arriba"
-                              >
-                                ▲
-                              </button>
-                              <button 
-                                onClick={() => moveDollPosition(index, 'down')}
-                                disabled={index === filteredMyCollection.length - 1}
-                                className="bg-gray-800 hover:bg-pink-600 text-gray-300 hover:text-white text-[8px] px-1 rounded disabled:opacity-30 disabled:hover:bg-gray-800"
-                                title="Mover Abajo"
-                              >
-                                ▼
-                              </button>
-                            </div>
-                          )}
-
                           <button 
                             onClick={() => handleOpenEditPrice(item)}
                             className="bg-gray-800 text-yellow-400 text-[10px] p-1.5 rounded hover:bg-gray-700 transition"
