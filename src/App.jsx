@@ -64,6 +64,9 @@ export default function App() {
   const [myCollection, setMyCollection] = useState([]);
   const [wishlist, setWishlist] = useState([]);
 
+  // ORDENACIÓN DE LA VITRINA
+  const [vitrinaSortBy, setVitrinaSortBy] = useState('custom'); // 'custom', 'year-desc', 'year-asc', 'name-asc', 'price-desc', 'line'
+
   // Interfaz móvil / pública / scroll
   const [showMobileMetrics, setShowMobileMetrics] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -114,7 +117,6 @@ export default function App() {
   const [currency, setCurrency] = useState('EUR');
   const exchangeRateUSD = 1.08;
 
-  // DETECTAR VISTAS PÚBLICAS DESDE EL ENLACE COMPARTIDO EN REDES
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sharedUserId = params.get('vitrina');
@@ -164,7 +166,6 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // CARGAR VITRINA PÚBLICA PARA VISITANTES DE INSTAGRAM/REDES
   async function fetchPublicVitrina(userId) {
     if (!supabase) return;
     setLoading(true);
@@ -275,7 +276,19 @@ export default function App() {
     }
   }
 
-  // CAMBIAR NOMBRE DE USUARIO / PERFIL
+  // REORDENAR MUÑECAS EN POSICIÓN MANUAL (ARRIBA / ABAJO)
+  const moveDollPosition = (index, direction) => {
+    const newCollection = [...myCollection];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newCollection.length) return;
+
+    const temp = newCollection[index];
+    newCollection[index] = newCollection[targetIndex];
+    newCollection[targetIndex] = temp;
+
+    setMyCollection(newCollection);
+  };
+
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     if (!supabase || !session) return;
@@ -295,7 +308,6 @@ export default function App() {
     }
   };
 
-  // MANEJO DE CAMBIO DE CONTRASEÑA EN SUPABASE
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
     setPasswordStatus({ error: null, success: null, loading: true });
@@ -332,7 +344,6 @@ export default function App() {
     }
   };
 
-  // LOG IN / REGISTRO
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     if (!supabase) {
@@ -798,11 +809,21 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  const filteredMyCollection = activeCollection.filter((barbie) => {
-    const nameMatch = (barbie.name || '').toLowerCase().includes(vitrinaSearchTerm.toLowerCase());
-    const lineMatch = (barbie.collection_line || '').toLowerCase().includes(vitrinaSearchTerm.toLowerCase());
-    return nameMatch || lineMatch;
-  });
+  // FILTRADO Y ORDENACIÓN DINÁMICA DE LA VITRINA
+  const filteredMyCollection = activeCollection
+    .filter((barbie) => {
+      const nameMatch = (barbie.name || '').toLowerCase().includes(vitrinaSearchTerm.toLowerCase());
+      const lineMatch = (barbie.collection_line || '').toLowerCase().includes(vitrinaSearchTerm.toLowerCase());
+      return nameMatch || lineMatch;
+    })
+    .sort((a, b) => {
+      if (vitrinaSortBy === 'year-desc') return (Number(b.release_year) || 0) - (Number(a.release_year) || 0);
+      if (vitrinaSortBy === 'year-asc') return (Number(a.release_year) || 0) - (Number(b.release_year) || 0);
+      if (vitrinaSortBy === 'name-asc') return (a.name || '').localeCompare(b.name || '');
+      if (vitrinaSortBy === 'price-desc') return (Number(b.estimated_min_price) || 0) - (Number(a.estimated_min_price) || 0);
+      if (vitrinaSortBy === 'line') return (a.collection_line || '').localeCompare(b.collection_line || '');
+      return 0; // 'custom' mantiene el orden del array
+    });
 
   const filteredMasterCatalog = masterCatalog.filter((barbie) => {
     const nameMatch = (barbie.name || '').toLowerCase().includes(catalogSearchTerm.toLowerCase());
@@ -993,7 +1014,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
           </div>
 
           <div className="flex items-center gap-1.5">
-            {/* BOTÓN COMPARTIR VITRINA */}
             <button
               onClick={() => setShowShareModal(true)}
               className="bg-pink-600/90 hover:bg-pink-500 border border-pink-500 text-white text-[10px] px-2 py-1 rounded-lg font-extrabold flex items-center gap-1 transition shadow-md shadow-pink-600/20"
@@ -1009,7 +1029,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               <span className="text-gray-400 font-normal">Valor:</span> {currency === 'EUR' ? `${totalCollectionValueEUR.toLocaleString()} €` : `${Math.round(totalCollectionValueEUR * exchangeRateUSD).toLocaleString()} $`}
             </button>
 
-            {/* BOTÓN EDITAR PERFIL / USERNAME */}
             <button
               onClick={() => setShowProfileModal(true)}
               className="bg-gray-800/80 border border-gray-700/80 text-pink-300 hover:text-white text-xs p-1.5 rounded-lg transition"
@@ -1018,7 +1037,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               👤
             </button>
 
-            {/* BOTÓN CAMBIAR CONTRASEÑA */}
             <button
               onClick={() => setShowPasswordModal(true)}
               className="bg-gray-800/80 border border-gray-700/80 text-yellow-400 hover:text-yellow-300 text-xs p-1.5 rounded-lg transition"
@@ -1066,7 +1084,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
         {/* TAB: MI VITRINA */}
         {activeTab === 'vitrina' && (
           <section>
-            <div className="sticky top-12 z-30 bg-gray-900/95 backdrop-blur-md p-2 rounded-xl mb-3 border border-pink-900/30 flex items-center gap-2 shadow-lg">
+            <div className="sticky top-12 z-30 bg-gray-900/95 backdrop-blur-md p-2.5 rounded-xl mb-3 border border-pink-900/30 flex flex-col sm:flex-row gap-2 shadow-lg">
               <div className="relative w-full">
                 <input
                   type="text"
@@ -1080,12 +1098,31 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                 </svg>
               </div>
 
-              <button 
-                onClick={() => setCurrency(currency === 'EUR' ? 'USD' : 'EUR')}
-                className="text-[10px] bg-gray-800 hover:bg-gray-700 border border-gray-700 text-pink-400 px-2.5 py-1.5 rounded-lg font-bold shrink-0 transition"
-              >
-                {currency === 'EUR' ? '€ EUR' : '$ USD'}
-              </button>
+              <div className="flex items-center gap-2 justify-between sm:justify-end shrink-0">
+                {/* SELECTOR DE ORDENACIÓN */}
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-bold text-pink-400 uppercase tracking-wider">Ordenar:</span>
+                  <select
+                    value={vitrinaSortBy}
+                    onChange={(e) => setVitrinaSortBy(e.target.value)}
+                    className="bg-gray-800 border border-gray-700/80 text-white rounded-md px-2 py-1 text-[11px] focus:outline-none focus:border-pink-500"
+                  >
+                    <option value="custom">Orden Personalizado / Manual</option>
+                    <option value="year-desc">Año: Más Reciente primero</option>
+                    <option value="year-asc">Año: Más Antiguo (Vintage)</option>
+                    <option value="name-asc">Nombre (A - Z)</option>
+                    <option value="price-desc">Precio: Mayor a Menor</option>
+                    <option value="line">Por Línea de Colección</option>
+                  </select>
+                </div>
+
+                <button 
+                  onClick={() => setCurrency(currency === 'EUR' ? 'USD' : 'EUR')}
+                  className="text-[10px] bg-gray-800 hover:bg-gray-700 border border-gray-700 text-pink-400 px-2.5 py-1.5 rounded-lg font-bold shrink-0 transition"
+                >
+                  {currency === 'EUR' ? '€ EUR' : '$ USD'}
+                </button>
+              </div>
             </div>
 
             {filteredMyCollection.length === 0 ? (
@@ -1094,7 +1131,7 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                {filteredMyCollection.map((item) => {
+                {filteredMyCollection.map((item, index) => {
                   const qty = Number(item.quantity) || 1;
                   return (
                     <div key={item.userInstanceId || item.id} className="bg-gray-900/90 border border-gray-800/90 rounded-xl overflow-hidden flex flex-col justify-between group relative">
@@ -1163,7 +1200,30 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
                             <p className="text-[8px] text-gray-500 font-semibold">Total: {item.estimated_min_price * qty} €</p>
                           )}
                         </div>
-                        <div className="flex gap-1">
+                        
+                        <div className="flex gap-1 items-center">
+                          {/* BOTONES DE MOVER POSICIÓN MANUAL (SOLO SI ORDEN ES CUSTOM) */}
+                          {vitrinaSortBy === 'custom' && (
+                            <div className="flex flex-col gap-0.5 mr-1">
+                              <button 
+                                onClick={() => moveDollPosition(index, 'up')}
+                                disabled={index === 0}
+                                className="bg-gray-800 hover:bg-pink-600 text-gray-300 hover:text-white text-[8px] px-1 rounded disabled:opacity-30 disabled:hover:bg-gray-800"
+                                title="Mover Arriba"
+                              >
+                                ▲
+                              </button>
+                              <button 
+                                onClick={() => moveDollPosition(index, 'down')}
+                                disabled={index === filteredMyCollection.length - 1}
+                                className="bg-gray-800 hover:bg-pink-600 text-gray-300 hover:text-white text-[8px] px-1 rounded disabled:opacity-30 disabled:hover:bg-gray-800"
+                                title="Mover Abajo"
+                              >
+                                ▼
+                              </button>
+                            </div>
+                          )}
+
                           <button 
                             onClick={() => handleOpenEditPrice(item)}
                             className="bg-gray-800 text-yellow-400 text-[10px] p-1.5 rounded hover:bg-gray-700 transition"
@@ -1904,66 +1964,62 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
       )}
 
       {/* MODAL: COMPARTIR EN REDES */}
-{showShareModal && (
-  <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-xs w-full relative">
-      <button 
-        onClick={() => setShowShareModal(false)}
-        className="absolute top-2 right-2 text-gray-400 hover:text-white font-bold text-xs"
-      >
-        ✕
-      </button>
-      <h3 className="text-sm font-bold text-pink-500 mb-1">Compartir mi Vitrina</h3>
-      <p className="text-[11px] text-gray-400 mb-3">Publica tu colección en tus redes sociales.</p>
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 max-w-xs w-full relative">
+            <button 
+              onClick={() => setShowShareModal(false)}
+              className="absolute top-2 right-2 text-gray-400 hover:text-white font-bold text-xs"
+            >
+              ✕
+            </button>
+            <h3 className="text-sm font-bold text-pink-500 mb-1">Compartir mi Vitrina</h3>
+            <p className="text-[11px] text-gray-400 mb-3">Publica tu colección en tus redes sociales.</p>
 
-      <div className="space-y-2 text-xs">
-        {/* WhatsApp */}
-        <a
-          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(getShareText())}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-between bg-green-950/60 border border-green-800/80 p-2 rounded text-[11px] font-bold text-green-300 hover:bg-green-900/50 transition"
-        >
-          <span>WhatsApp</span>
-          <span>Enviar ➔</span>
-        </a>
+            <div className="space-y-2 text-xs">
+              <a
+                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(getShareText())}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between bg-green-950/60 border border-green-800/80 p-2 rounded text-[11px] font-bold text-green-300 hover:bg-green-900/50 transition"
+              >
+                <span>WhatsApp</span>
+                <span>Enviar ➔</span>
+              </a>
 
-        {/* Facebook */}
-        <a
-          href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getPublicVitrinaUrl())}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-between bg-blue-950/60 border border-blue-800/80 p-2 rounded text-[11px] font-bold text-blue-300 hover:bg-blue-900/50 transition"
-        >
-          <span>Facebook</span>
-          <span>Compartir ➔</span>
-        </a>
+              <a
+                href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getPublicVitrinaUrl())}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between bg-blue-950/60 border border-blue-800/80 p-2 rounded text-[11px] font-bold text-blue-300 hover:bg-blue-900/50 transition"
+              >
+                <span>Facebook</span>
+                <span>Compartir ➔</span>
+              </a>
 
-        {/* X (Twitter) */}
-        <a
-          href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(getShareText())}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-between bg-sky-950/60 border border-sky-800/80 p-2 rounded text-[11px] font-bold text-sky-300 hover:bg-sky-900/50 transition"
-        >
-          <span>X (Twitter)</span>
-          <span>Postear ➔</span>
-        </a>
+              <a
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(getShareText())}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between bg-sky-950/60 border border-sky-800/80 p-2 rounded text-[11px] font-bold text-sky-300 hover:bg-sky-900/50 transition"
+              >
+                <span>X (Twitter)</span>
+                <span>Postear ➔</span>
+              </a>
 
-        {/* Copiar enlace para Instagram / TikTok */}
-        <div className="pt-2 border-t border-gray-800">
-          <p className="text-[9px] text-gray-400 mb-1 font-semibold">Para Instagram / TikTok / Bio:</p>
-          <button
-            onClick={handleCopyShareLink}
-            className="w-full text-center bg-pink-600 hover:bg-pink-500 text-white p-2 rounded text-[11px] font-bold transition shadow-md"
-          >
-            {copiedLink ? '¡Enlace Copiado al Portapapeles!' : 'Copiar Enlace de mi Vitrina'}
-          </button>
+              <div className="pt-2 border-t border-gray-800">
+                <p className="text-[9px] text-gray-400 mb-1 font-semibold">Para Instagram / TikTok / Bio:</p>
+                <button
+                  onClick={handleCopyShareLink}
+                  className="w-full text-center bg-pink-600 hover:bg-pink-500 text-white p-2 rounded text-[11px] font-bold transition shadow-md"
+                >
+                  {copiedLink ? '¡Enlace Copiado al Portapapeles!' : 'Copiar Enlace de mi Vitrina'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
       {/* MODAL: CONFIRMAR REGISTRO O UNIDADES REPETIDAS A MI VITRINA */}
       {activeModal?.type === 'add_to_vitrina' && (
