@@ -250,7 +250,7 @@ export default function App() {
       if (colErr) console.error("Error cargando user_collection:", colErr);
 
       if (colData) {
-        const userItems = colData.map(item => {
+        let userItems = colData.map(item => {
           const matchedMaster = catalogMap[item.barbie_id] || {};
           return {
             ...matchedMaster,
@@ -268,6 +268,25 @@ export default function App() {
           };
         });
 
+        // PERSISTENCIA DEL ORDEN PERSONALIZADO TRAS REFRESCAR
+        const savedOrder = localStorage.getItem(`vitrina_order_${currentUserId}`);
+        if (savedOrder) {
+          try {
+            const orderArray = JSON.parse(savedOrder);
+            userItems.sort((a, b) => {
+              const idA = a.userInstanceId || a.id;
+              const idB = b.userInstanceId || b.id;
+              const indexA = orderArray.indexOf(idA);
+              const indexB = orderArray.indexOf(idB);
+              if (indexA === -1) return 1;
+              if (indexB === -1) return -1;
+              return indexA - indexB;
+            });
+          } catch (e) {
+            console.error("Error aplicando orden guardado:", e);
+          }
+        }
+
         setMyCollection(userItems);
       }
     } catch (e) {
@@ -277,7 +296,7 @@ export default function App() {
     }
   }
 
-  // LÓGICA DE DRAG & DROP FÍSICO (RATÓN / DEDO)
+  // LÓGICA DE DRAG & DROP FÍSICO Y PERSISTENCIA DE ORDEN
   const handleDragStart = (index) => {
     setDraggedItemIndex(index);
   };
@@ -299,6 +318,11 @@ export default function App() {
 
   const handleDragEnd = () => {
     setDraggedItemIndex(null);
+    // Guarda el orden personalizado localmente para que persista al recargar la página
+    if (vitrinaSortBy === 'custom' && session?.user?.id) {
+      const orderIds = myCollection.map(item => item.userInstanceId || item.id);
+      localStorage.setItem(`vitrina_order_${session.user.id}`, JSON.stringify(orderIds));
+    }
   };
 
   const handleSaveProfile = async (e) => {
@@ -624,6 +648,7 @@ export default function App() {
     }
   };
 
+  // CORREGIDA: DESBLOQUEA EL BOTÓN Y LIMPIA EL ESTADO
   const handleSaveDirectToCatalog = async () => {
     if (!scanResult?.primary_match) return;
 
@@ -643,16 +668,20 @@ export default function App() {
       if (error) {
         console.error("Error al guardar en barbies_master:", error);
         setDebugError(`Error guardando en catálogo: ${error.message}`);
+        setScanning(false);
         return;
       }
     } else {
       setMasterCatalog(prev => [...prev, { ...payloadMaster, id: Date.now() }]);
     }
 
-    await fetchData(session?.user?.id);
+    setScanning(false);
     setScanResult(null);
     setScannedImageBase64(null);
     setSaveSuccessMsg('¡Barbie guardada con éxito en el Catálogo Maestro!');
+
+    await fetchData(session?.user?.id);
+
     setTimeout(() => setSaveSuccessMsg(''), 3000);
     setActiveTab('catalog');
   };
@@ -1111,7 +1140,6 @@ Devuelve EXCLUSIVAMENTE un JSON válido con esta estructura:
               </div>
 
               <div className="flex items-center gap-2 justify-between sm:justify-end shrink-0">
-                {/* SELECTOR DE ORDENACIÓN */}
                 <div className="flex items-center gap-1">
                   <span className="text-[10px] font-bold text-pink-400 uppercase tracking-wider">Agrupar por:</span>
                   <select
