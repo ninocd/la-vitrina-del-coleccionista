@@ -407,17 +407,18 @@ export default function App() {
       }
     } else {
       try {
+        // Consulta la tabla public.profiles para contar usuarios reales registrados
         const { count, error: countErr } = await supabase
-          .from('user_collection')
-          .select('user_id', { count: 'exact', head: true });
+          .from('profiles')
+          .select('id', { count: 'exact', head: true });
 
-        if (!countErr && count && count >= 50) {
+        if (!countErr && count !== null && count >= 50) {
           setAuthError("La Versión Beta ha alcanzado el cupo máximo de 50 probadores. ¡Gracias por tu interés!");
           setAuthSubmitting(false);
           return;
         }
       } catch (err) {
-        console.warn("No se pudo verificar el conteo de usuarios:", err);
+        console.warn("No se pudo verificar el conteo de usuarios en profiles:", err);
       }
 
       const { data, error } = await supabase.auth.signUp({
@@ -648,7 +649,6 @@ export default function App() {
     }
   };
 
-  // CORREGIDA: DESBLOQUEA EL BOTÓN Y LIMPIA EL ESTADO
   const handleSaveDirectToCatalog = async () => {
     if (!scanResult?.primary_match) return;
 
